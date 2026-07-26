@@ -2751,13 +2751,13 @@ function CorporateLandingPage({ onNavigate }) {
     },
   ];
 
-  const neededInfo = [
-    "Official SEC/DTI registration details",
-    "Business address and service areas",
-    "Final company contact numbers and email",
-    "Company mission, vision, and core values",
-    "Final brand photos, team photos, and office or store images",
-    "Policies for orders, delivery, cancellation, and refunds",
+  const companyHighlights = [
+    "Registered business documents are available for customer reference.",
+    "Order and booking updates are managed through the admin dashboard.",
+    "Payment proofs are recorded per business for clearer tracking.",
+    "Customer inquiries are reviewed before production or delivery confirmation.",
+    "Product, stock, discount, and schedule details can be updated anytime.",
+    "Built for The Grace Shop and Little Jessie Studyo as one growing company.",
   ];
 
   return (
@@ -2924,12 +2924,17 @@ function CorporateLandingPage({ onNavigate }) {
       <section id="information" className="border-t border-neutral-200 bg-neutral-950 py-16 text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 md:grid-cols-[.9fr_1.1fr] lg:px-8">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#d8bd6a]">For Completion</p>
-            <h2 className="mt-3 font-serif text-3xl font-bold sm:text-4xl">Information to prepare before launch.</h2>
-            <p className="mt-4 text-sm leading-7 text-white/65">These are the details that will make the corporate landing page complete, credible, and ready for public visitors.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#d8bd6a]">Customer Confidence</p>
+            <h2 className="mt-3 font-serif text-3xl font-bold sm:text-4xl">A transparent company built for everyday orders and special occasions.</h2>
+            <p className="mt-4 text-sm leading-7 text-white/65">TGS Enterprices Corp. brings together fashion retail, personalized souvenirs, and event services with organized order handling, clear payment records, and customer-focused support.</p>
+            <div className="mt-6 grid gap-2 text-sm text-white/70">
+              <p><span className="font-semibold text-white">Email:</span> thegraceshopcainta@gmail.com</p>
+              <p><span className="font-semibold text-white">Mobile:</span> 09524804413</p>
+              <p><span className="font-semibold text-white">Business Hours:</span> Monday to Sunday, 10:00 AM to 8:00 PM</p>
+            </div>
           </div>
           <div className="grid gap-3">
-            {neededInfo.map((item) => (
+            {companyHighlights.map((item) => (
               <div key={item} className="border border-white/10 bg-white/5 p-4 text-sm font-semibold text-white/85">{item}</div>
             ))}
           </div>
