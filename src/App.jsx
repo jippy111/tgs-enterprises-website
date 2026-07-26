@@ -2893,7 +2893,7 @@ function CorporateLandingPage({ onNavigate }) {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
           <button type="button" onClick={() => onNavigate("/")} className="text-left">
             <p className="text-sm font-black uppercase tracking-[0.28em] text-neutral-950">TGS</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#b78a1f]">Enterprices Corp.</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#b78a1f]">Enterprises Corp.</p>
           </button>
           <nav className="hidden items-center gap-6 text-sm font-semibold md:flex">
             <a href="#brands" className="text-neutral-600 hover:text-neutral-950">Brands</a>
@@ -2906,7 +2906,7 @@ function CorporateLandingPage({ onNavigate }) {
       <section className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 md:grid-cols-[1fr_.85fr] md:items-center lg:px-8 lg:py-24">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#b78a1f]">Fashion bags, personalized souvenirs, and event services</p>
-          <h1 className="mt-5 font-serif text-4xl font-bold leading-tight sm:text-6xl">TGS ENTERPRICES CORP.</h1>
+          <h1 className="mt-5 font-serif text-4xl font-bold leading-tight sm:text-6xl">TGS ENTERPRISES CORP.</h1>
           <p className="mt-5 max-w-2xl text-base leading-8 text-neutral-600 sm:text-lg">We provide stylish bags and creative personalized souvenirs designed to bring value, convenience, and joy to customers across everyday life and special occasions.</p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <button type="button" onClick={() => onNavigate("/the-grace-shop")} className="bg-neutral-950 px-6 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white hover:bg-[#9f7418]">Visit The Grace Shop</button>
@@ -2926,7 +2926,7 @@ function CorporateLandingPage({ onNavigate }) {
       <section id="mission-vision" className="border-y border-neutral-200 bg-white py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-8 max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#b78a1f]">About TGS Enterprices Corp.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#b78a1f]">About TGS Enterprises Corp.</p>
             <h2 className="mt-3 font-serif text-3xl font-bold sm:text-4xl">Built on quality, service, creativity, and continuous improvement.</h2>
           </div>
           <div className="grid gap-5 lg:grid-cols-3">
@@ -2982,7 +2982,7 @@ function CorporateLandingPage({ onNavigate }) {
           <div className="mb-8 max-w-2xl">
             <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#b78a1f]">Registration and Compliance</p>
             <h2 className="mt-3 font-serif text-3xl font-bold sm:text-4xl">Official business registration details.</h2>
-            <p className="mt-4 text-sm leading-7 text-neutral-600">These records help customers identify the registered businesses behind TGS Enterprices Corp., The Grace Shop, and Little Jessie Studyo, supporting a more transparent and trustworthy buying experience.</p>
+            <p className="mt-4 text-sm leading-7 text-neutral-600">These records help customers identify the registered businesses behind TGS Enterprises Corp., The Grace Shop, and Little Jessie Studyo, supporting a more transparent and trustworthy buying experience.</p>
           </div>
           <div className="grid gap-5 md:grid-cols-2">
             <article className="border border-emerald-100 bg-emerald-50 p-6">
@@ -3048,7 +3048,7 @@ function CorporateLandingPage({ onNavigate }) {
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#d8bd6a]">Customer Confidence</p>
             <h2 className="mt-3 font-serif text-3xl font-bold sm:text-4xl">A transparent company built for everyday orders and special occasions.</h2>
-            <p className="mt-4 text-sm leading-7 text-white/65">TGS Enterprices Corp. brings together fashion retail, personalized souvenirs, and event services with organized order handling, clear payment records, and customer-focused support.</p>
+            <p className="mt-4 text-sm leading-7 text-white/65">TGS Enterprises Corp. brings together fashion retail, personalized souvenirs, and event services with organized order handling, clear payment records, and customer-focused support.</p>
             <div className="mt-6 grid gap-2 text-sm text-white/70">
               <p><span className="font-semibold text-white">Email:</span> thegraceshopcainta@gmail.com</p>
               <p><span className="font-semibold text-white">Mobile:</span> 09524804413</p>

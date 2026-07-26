@@ -1,4 +1,4 @@
-# Launch Checklist for TGS Enterprices Corp.
+# Launch Checklist for TGS Enterprises Corp.
 
 ## Recommended hosting
 

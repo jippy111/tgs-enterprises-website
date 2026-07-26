@@ -1,4 +1,4 @@
--- TGS ENTERPRICES CORP. Supabase database schema
+-- TGS ENTERPRISES CORP. Supabase database schema
 -- Run this in the Supabase SQL editor before connecting the live app.
 
 create table if not exists admin_profiles (
