@@ -4,6 +4,7 @@ import { backendEnabled, deleteRecord, fetchTable, insertRecord, signOutBackendA
 
 const navItems = ["Home", "Shop", "Track", "About", "FAQ", "Contact"];
 const logo = "/assets/tgs-logo.jfif";
+const corporateLogo = "/assets/tgs-enterprises-corp-logo.svg";
 const heroImage = "/assets/tgs-hero-model.png";
 const birRegistrationImage = "/assets/registrations/bir-registration.jfif";
 const tgsBirRegistrationImage = "/assets/registrations/tgs-bir-registration.jfif";
@@ -2903,8 +2904,7 @@ function CorporateLandingPage({ onNavigate }) {
       <header className="border-b border-neutral-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
           <button type="button" onClick={() => onNavigate("/")} className="text-left">
-            <p className="text-sm font-black uppercase tracking-[0.28em] text-neutral-950">TGS</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#b78a1f]">Enterprises Corp.</p>
+            <img src={corporateLogo} alt="TGS Enterprises Corp." className="h-12 w-auto object-contain" />
           </button>
           <nav className="hidden items-center gap-6 text-sm font-semibold md:flex">
             <a href="#brands" className="text-neutral-600 hover:text-neutral-950">Brands</a>

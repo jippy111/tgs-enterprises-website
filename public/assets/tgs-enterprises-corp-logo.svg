@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 220" role="img" aria-labelledby="title desc">
+  <title id="title">TGS Enterprises Corp. logo</title>
+  <desc id="desc">Premium black and gold corporate logo with a TGS monogram and company name.</desc>
+  <rect width="760" height="220" fill="#fffdf8"/>
+  <g transform="translate(48 34)">
+    <rect x="0" y="0" width="152" height="152" rx="0" fill="#111111"/>
+    <rect x="12" y="12" width="128" height="128" fill="none" stroke="#d8bd6a" stroke-width="3"/>
+    <path d="M44 50h64v14H84v54H68V64H44V50Z" fill="#fffdf8"/>
+    <path d="M104 80c0-19 14-32 34-32 11 0 21 4 28 12l-10 10c-5-5-10-8-18-8-11 0-18 7-18 18s7 19 18 19c5 0 10-1 14-4v-8h-17V75h32v28c-7 7-18 11-30 11-20 0-33-14-33-34Z" fill="#d8bd6a" transform="translate(-34 0)"/>
+    <path d="M96 116c9 0 16-4 16-10 0-7-7-9-18-12-16-4-29-10-29-27 0-16 13-27 32-27 14 0 25 5 33 15l-11 10c-6-7-13-10-22-10-9 0-15 4-15 10 0 7 8 9 20 12 16 4 28 10 28 27 0 16-13 27-34 27-17 0-30-6-38-18l12-10c6 8 15 13 26 13Z" fill="#fffdf8" transform="translate(0 8) scale(.82)"/>
+  </g>
+  <g transform="translate(238 57)">
+    <text x="0" y="44" fill="#111111" font-family="Georgia, 'Times New Roman', serif" font-size="56" font-weight="700" letter-spacing="1">TGS</text>
+    <text x="0" y="96" fill="#111111" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="800" letter-spacing="5">ENTERPRISES CORP.</text>
+    <line x1="0" y1="121" x2="360" y2="121" stroke="#d8bd6a" stroke-width="3"/>
+    <text x="0" y="148" fill="#6f6a60" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" letter-spacing="3">BAGS  •  SOUVENIRS  •  EVENT SERVICES</text>
+  </g>
+</svg>
