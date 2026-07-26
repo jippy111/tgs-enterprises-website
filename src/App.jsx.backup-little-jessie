@@ -1,0 +1,1531 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { categories, formatCurrency, products as defaultProducts } from "./data/products";
+
+const navItems = ["Home", "Shop", "Track", "About", "FAQ", "Contact"];
+const logo = "/src/assets/tgs-logo.jfif";
+const heroImage = "/src/assets/tgs-hero-model.png";
+const deliveryFee = 150;
+const cartStorageKey = "tgs-cart-items";
+const productStorageKey = "tgs-products-v5";
+const orderStorageKey = "tgs-admin-orders";
+const adminSessionKey = "tgs-admin-session";
+const adminPassword = "grace2026";
+const discountOptions = Array.from({ length: 11 }, (_, index) => index * 5);
+const orderStatuses = ["Pending", "Paid", "Preparing", "Shipped", "Completed", "Cancelled"];
+
+function getDiscountedPrice(product) {
+  const discount = Number(product.discount ?? 0);
+  return Math.round(product.price * (1 - discount / 100));
+}
+
+function readSavedProducts() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(productStorageKey));
+    return Array.isArray(saved) && saved.length ? saved : defaultProducts;
+  } catch {
+    return defaultProducts;
+  }
+}
+
+function getStockLabel(stock) {
+  if (stock <= 0) return "Sold Out";
+  if (stock <= 3) return "Low Stock";
+  return "In Stock";
+}
+
+function getStockClasses(stock) {
+  if (stock <= 0) return "border-neutral-300 bg-neutral-100 text-neutral-500";
+  if (stock <= 3) return "border-[#b78a1f] bg-[#fff8e6] text-[#8a6412]";
+  return "border-emerald-200 bg-emerald-50 text-emerald-700";
+}
+
+function getProductColors(product) {
+  if (Array.isArray(product.colors) && product.colors.length) return product.colors;
+  if (!product.color) return ["Default"];
+  return product.color
+    .split(/,| and /)
+    .map((color) => color.trim())
+    .filter(Boolean);
+}
+
+function getDefaultColor(product) {
+  return getProductColors(product)[0] ?? "Default";
+}
+
+function getCartKey(product, selectedColor) {
+  return product.id + "::" + selectedColor;
+}
+
+function getProductSpecs(product) {
+  const fallback = {
+    size: "Compact everyday size",
+    material: "Premium faux leather",
+    strap: "Comfortable hand or shoulder carry",
+    closure: "Secure main compartment",
+    care: "Wipe gently with a soft dry cloth",
+  };
+  return { ...fallback, ...(product.specs ?? {}) };
+}
+
+const specLabels = {
+  size: "Size",
+  material: "Material",
+  strap: "Strap",
+  closure: "Closure",
+  care: "Care",
+};
+
+function readSavedCart() {
+  try {
+    return JSON.parse(localStorage.getItem(cartStorageKey)) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function readSavedOrders() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(orderStorageKey));
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+}
+
+function readAdminSession() {
+  return sessionStorage.getItem(adminSessionKey) === "true";
+}
+
+function formatOrderDate(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+const paymentDetails = {
+  GCash: {
+    label: "GCash",
+    account: "The Grace Shop",
+    note: "Scan or save the GCash QR code, then send proof of payment after checkout.",
+    qrLabel: "GCASH QR",
+  },
+  "Bank Transfer": {
+    label: "Bank Transfer",
+    account: "The Grace Shop",
+    note: "Scan or save the bank QR code, then send proof of transfer after checkout.",
+    qrLabel: "BANK QR",
+  },
+  Maya: {
+    label: "Maya / PayMaya",
+    account: "The Grace Shop",
+    note: "Scan or save the Maya QR code, then send proof of payment after checkout.",
+    qrLabel: "MAYA QR",
+  },
+};
+
+function PaymentQrBox({ method }) {
+  const details = paymentDetails[method] ?? paymentDetails.GCash;
+
+  return (
+    <div className="border border-[#ead9a8]/70 bg-[#fff9ed] p-3 sm:p-4">
+      <div className="grid gap-4 sm:grid-cols-[140px_1fr] sm:items-center">
+        <div className="grid aspect-square place-items-center border border-[#d7bd72] bg-white p-3">
+          <div className="grid h-full w-full place-items-center border border-dashed border-neutral-300 bg-[linear-gradient(45deg,#111_25%,transparent_25%),linear-gradient(-45deg,#111_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#111_75%),linear-gradient(-45deg,transparent_75%,#111_75%)] bg-[length:18px_18px] bg-[position:0_0,0_9px,9px_-9px,-9px_0] text-center">
+            <span className="bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-neutral-950">{details.qrLabel}</span>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#b78a1f]">Payment QR</p>
+          <h3 className="mt-1 text-lg font-bold">{details.label}</h3>
+          <p className="mt-2 text-sm leading-6 text-neutral-600">{details.note}</p>
+          <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">Account name: {details.account}</p>
+          <button type="button" className="mt-4 border border-neutral-950 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] transition hover:bg-neutral-950 hover:text-white">
+            Save QR Placeholder
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getOrderStatusMessage(order) {
+  if (!order) return "";
+  if (order.paymentChecked || order.status === "Preparing") return "Payment received. We are preparing to ship your order.";
+  if (order.status === "Paid") return "Payment received. Your order is waiting for preparation.";
+  if (order.status === "Shipped") return "Your order has been shipped.";
+  if (order.status === "Completed") return "Your order has been completed. Thank you for shopping with The Grace Shop.";
+  if (order.status === "Cancelled") return "This order has been cancelled. Please contact The Grace Shop for assistance.";
+  return "Order received. Please complete payment and send proof so we can prepare your order.";
+}
+
+function TrustStrip() {
+  const items = [
+    ["Quality checked", "Every piece is carefully reviewed before order confirmation."],
+    ["Graceful styling", "Polished silhouettes made for everyday elegance."],
+    ["Direct order support", "We confirm order details before payment instructions are sent."],
+  ];
+
+  return (
+    <section className="border-y border-[#ead9a8] bg-[#111111] text-white">
+      <div className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-7 sm:px-6 sm:py-8 md:grid-cols-3 lg:px-8">
+        {items.map(([title, copy]) => (
+          <div key={title} className="border-l border-[#b78a1f] pl-5">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#d8bd6a]">{title}</p>
+            <p className="mt-2 text-sm leading-6 text-white/65">{copy}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProductCard({ product, onAdd, onView }) {
+  const colors = getProductColors(product);
+  const [selectedColor, setSelectedColor] = useState(getDefaultColor(product));
+  const isSoldOut = product.stock <= 0;
+  const salePrice = getDiscountedPrice(product);
+  const hasDiscount = Number(product.discount ?? 0) > 0;
+
+  useEffect(() => {
+    setSelectedColor(getDefaultColor(product));
+  }, [product.id]);
+
+  return (
+    <article className="group overflow-hidden border border-[#ead9a8]/70 bg-white shadow-[0_18px_45px_rgba(17,17,17,0.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(17,17,17,0.10)]">
+      <button type="button" onClick={() => onView(product)} className="block w-full text-left">
+        <div className="aspect-[5/6] overflow-hidden bg-[#f7f0df] sm:aspect-[4/5]">
+          <img src={product.image} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" />
+        </div>
+        <div className="p-4 pb-0 sm:p-5 sm:pb-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b78a1f]">{product.category}</p>
+          <div className="mt-2 flex items-start justify-between gap-3">
+            <h3 className="text-lg font-bold leading-tight">{product.name}</h3>
+            {hasDiscount && <span className="shrink-0 bg-[#b78a1f] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white">-{product.discount}%</span>}
+          </div>
+          <p className="mt-1 text-sm text-neutral-500">{product.color}</p>
+          <span className={"mt-3 inline-flex border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] " + getStockClasses(product.stock)}>
+            {getStockLabel(product.stock)}{product.stock > 0 ? ` - ${product.stock} left` : ""}
+          </span>
+        </div>
+      </button>
+      <div className="p-4 sm:p-5">
+        <label className="mb-4 grid gap-2 text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+          Choose Color
+          <select value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)} className="min-w-0 border border-neutral-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-neutral-950 outline-none transition focus:border-[#b78a1f]">
+            {colors.map((color) => <option key={color} value={color}>{color}</option>)}
+          </select>
+        </label>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            {hasDiscount && <p className="text-xs font-semibold text-neutral-400 line-through">{formatCurrency(product.price)}</p>}
+            <p className="font-bold">{formatCurrency(salePrice)}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <button type="button" onClick={() => onView(product)} className="border border-neutral-200 px-3 py-3 text-xs font-bold uppercase tracking-[0.12em] transition hover:border-[#b78a1f] sm:px-4 sm:py-2 sm:tracking-[0.14em]">
+              View
+            </button>
+            <button type="button" onClick={() => onAdd(product, selectedColor)} disabled={isSoldOut} className="bg-neutral-950 px-3 py-3 text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#9f7418] disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500 sm:px-4 sm:py-2 sm:tracking-[0.14em]">
+              {isSoldOut ? "Sold" : "Add"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ProductModal({ product, onClose, onAdd }) {
+  const [selectedColor, setSelectedColor] = useState(product ? getDefaultColor(product) : "Default");
+
+  useEffect(() => {
+    if (product) setSelectedColor(getDefaultColor(product));
+  }, [product?.id]);
+
+  if (!product) return null;
+
+  const colors = getProductColors(product);
+  const salePrice = getDiscountedPrice(product);
+  const hasDiscount = Number(product.discount ?? 0) > 0;
+
+  return (
+    <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/45 p-2 sm:p-4" onClick={onClose}>
+      <div className="mx-auto my-2 grid max-w-5xl bg-white shadow-2xl sm:my-8 md:grid-cols-2" onClick={(event) => event.stopPropagation()}>
+        <div className="bg-[#f7f0df]">
+          <img src={product.image} alt={product.name} className="h-full max-h-[320px] min-h-[240px] w-full object-cover sm:max-h-[420px] md:max-h-none md:min-h-[360px]" />
+        </div>
+        <div className="p-5 sm:p-8">
+          <div className="flex items-start justify-between gap-3 sm:gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">{product.category}</p>
+              <h2 className="mt-3 font-serif text-2xl font-bold leading-tight sm:text-4xl">{product.name}</h2>
+            </div>
+            <button type="button" onClick={onClose} className="border border-neutral-200 px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] hover:border-neutral-950">
+              Close
+            </button>
+          </div>
+          <div className="mt-4">
+            {hasDiscount && <p className="text-sm font-semibold text-neutral-400 line-through">{formatCurrency(product.price)}</p>}
+            <p className="text-2xl font-bold">{formatCurrency(salePrice)}</p>
+            {hasDiscount && <p className="mt-1 text-sm font-bold text-[#b78a1f]">{product.discount}% off</p>}
+          </div>
+          <label className="mt-4 grid gap-2 text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">
+            Choose Color
+            <select value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)} className="min-w-0 border border-neutral-200 bg-white px-3 py-3 text-sm font-semibold normal-case tracking-normal text-neutral-950 outline-none transition focus:border-[#b78a1f]">
+              {colors.map((color) => <option key={color} value={color}>{color}</option>)}
+            </select>
+          </label>
+          <span className={"mt-4 inline-flex border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] " + getStockClasses(product.stock)}>
+            {getStockLabel(product.stock)}{product.stock > 0 ? ` - ${product.stock} available` : ""}
+          </span>
+          <p className="mt-5 text-base leading-7 text-neutral-600">{product.description}</p>
+          <div className="mt-7 border-t border-neutral-200 pt-5">
+            <p className="text-sm font-bold uppercase tracking-[0.16em]">Product Specs</p>
+            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+              {Object.entries(getProductSpecs(product)).map(([key, value]) => (
+                <div key={key} className="border border-neutral-100 bg-[#fffdf8] p-3">
+                  <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#b78a1f]">{specLabels[key] ?? key}</dt>
+                  <dd className="mt-1 text-neutral-600">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <div className="mt-7 border-t border-neutral-200 pt-5">
+            <p className="text-sm font-bold uppercase tracking-[0.16em]">Details</p>
+            <ul className="mt-4 grid gap-2 text-sm text-neutral-600">
+              {product.details.map((detail) => <li key={detail}>- {detail}</li>)}
+            </ul>
+          </div>
+          <button type="button" disabled={product.stock <= 0} onClick={() => { onAdd(product, selectedColor); onClose(); }} className="mt-8 w-full bg-neutral-950 px-6 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#9f7418] disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500">
+            {product.stock <= 0 ? "Sold Out" : "Add to Bag"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CartSection({ cartItems, onIncrease, onDecrease, onRemove }) {
+  const subtotal = cartItems.reduce((sum, item) => sum + getDiscountedPrice(item) * item.quantity, 0);
+  const total = subtotal > 0 ? subtotal + deliveryFee : 0;
+
+  return (
+    <section id="cart" className="bg-white py-16">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Your bag</p>
+            <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Cart summary</h2>
+          </div>
+          <a href="#shop" className="w-fit border border-neutral-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-neutral-950 hover:text-white">
+            Continue Shopping
+          </a>
+        </div>
+
+        {cartItems.length === 0 ? (
+          <div className="border border-neutral-200 bg-[#fff9ed] p-8 text-center">
+            <p className="text-lg font-bold">Your bag is empty.</p>
+            <p className="mt-2 text-sm text-neutral-600">Add a bag from The Grace Shop collection to begin your order.</p>
+          </div>
+        ) : (
+          <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+            <div className="grid gap-4">
+              {cartItems.map((item) => (
+                <article key={item.cartKey || item.id} className="grid gap-3 border border-[#ead9a8]/70 bg-white p-3 shadow-[0_18px_45px_rgba(17,17,17,0.06)] sm:grid-cols-[112px_1fr_auto] sm:p-4">
+                  <img src={item.image} alt={item.name} className="h-36 w-full object-cover sm:h-28" />
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b78a1f]">{item.category}</p>
+                    <h3 className="mt-2 font-bold">{item.name}</h3>
+                    <p className="mt-1 text-sm text-neutral-500">{formatCurrency(getDiscountedPrice(item))}</p>
+                    <p className="mt-1 text-xs font-semibold text-neutral-500">Color: {item.selectedColor || getDefaultColor(item)}</p>
+                    <p className="mt-1 text-xs font-semibold text-neutral-500">Stock available: {item.stock}</p>
+                    <div className="mt-4 flex w-fit items-center border border-neutral-200">
+                      <button type="button" onClick={() => onDecrease(item.cartKey || item.id)} className="px-4 py-2 text-lg font-bold" aria-label="Decrease quantity">-</button>
+                      <span className="w-9 text-center text-sm font-bold">{item.quantity}</span>
+                      <button type="button" onClick={() => onIncrease(item.cartKey || item.id)} disabled={item.quantity >= item.stock} className="px-4 py-2 text-lg font-bold disabled:cursor-not-allowed disabled:text-neutral-300" aria-label="Increase quantity">+</button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 border-t border-neutral-100 pt-3 sm:grid sm:border-t-0 sm:pt-0 sm:justify-items-end">
+                    <p className="font-bold">{formatCurrency(getDiscountedPrice(item) * item.quantity)}</p>
+                    <button type="button" onClick={() => onRemove(item.cartKey || item.id)} className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500 transition hover:text-red-600">
+                      Remove
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <aside className="h-fit border border-[#ead9a8] bg-[#fff9ed] p-6">
+              <h3 className="text-xl font-bold">Order Total</h3>
+              <div className="mt-5 grid gap-3 text-sm">
+                <div className="flex justify-between"><span className="text-neutral-600">Subtotal</span><span className="font-semibold">{formatCurrency(subtotal)}</span></div>
+                <div className="flex justify-between"><span className="text-neutral-600">Delivery</span><span className="font-semibold">{formatCurrency(deliveryFee)}</span></div>
+                <div className="mt-2 flex justify-between border-t border-[#ead9a8] pt-4 text-lg font-bold"><span>Total</span><span>{formatCurrency(total)}</span></div>
+              </div>
+              <a href="#checkout" className="mt-6 flex w-full items-center justify-center bg-neutral-950 px-5 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#9f7418]">
+                Proceed to Checkout
+              </a>
+              <p className="mt-3 text-center text-xs leading-5 text-neutral-500 lg:hidden" aria-label="Mobile Checkout">Review your items and address before placing your order.</p>
+            </aside>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+
+function CheckoutSection({ cartItems, onPlaceOrder, orderPlaced }) {
+  const [confirmedReview, setConfirmedReview] = useState(false);
+  const [form, setForm] = useState({
+    fullName: "",
+    phone: "",
+    email: "",
+    houseUnit: "",
+    street: "",
+    barangay: "",
+    city: "",
+    province: "",
+    postalCode: "",
+    landmark: "",
+    payment: "GCash",
+    notes: "",
+  });
+  const subtotal = cartItems.reduce((sum, item) => sum + getDiscountedPrice(item) * item.quantity, 0);
+  const total = subtotal > 0 ? subtotal + deliveryFee : 0;
+
+  const updateForm = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const submitOrder = (event) => {
+    event.preventDefault();
+    onPlaceOrder(form);
+  };
+
+  if (orderPlaced) {
+    return (
+      <section id="checkout" className="border-t border-[#ead9a8]/70 bg-[#fff9ed] py-16">
+        <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+          <div className="border border-[#ead9a8] bg-white p-8 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Order received</p>
+            <h2 className="mt-3 font-serif text-3xl font-bold sm:text-4xl">Thank you, {orderPlaced.fullName}.</h2>
+            <p className="mt-3 text-sm font-bold uppercase tracking-[0.16em] text-neutral-500">Reference: {orderPlaced.reference}</p>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-neutral-600">
+              The Grace Shop has received your buyer information and complete delivery details. Please use the selected {orderPlaced.payment} QR code for payment, then send proof of payment so we can confirm and prepare your order.
+            </p>
+            <a href="#shop" className="mt-7 inline-flex bg-neutral-950 px-6 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#9f7418]">
+              Continue Shopping
+            </a>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section id="checkout" className="border-t border-[#ead9a8]/70 bg-[#fff9ed] pb-28 pt-16 lg:py-16">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Checkout</p>
+          <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Complete Your Order</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600">
+            Choose your preferred payment method below. The matching QR code will appear so you can scan or save it before placing your order.
+          </p>
+        </div>
+
+        {cartItems.length === 0 ? (
+          <div className="border border-[#ead9a8]/70 bg-white shadow-[0_18px_45px_rgba(17,17,17,0.06)] p-8 text-center">
+            <p className="text-lg font-bold">Add a bag before checkout.</p>
+            <a href="#shop" className="mt-5 inline-flex border border-neutral-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-neutral-950 hover:text-white">
+              Shop Bags
+            </a>
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[1fr_380px] lg:gap-8">
+            <form onSubmit={submitOrder} className="grid gap-5 border border-[#ead9a8]/70 bg-white p-4 shadow-[0_18px_45px_rgba(17,17,17,0.06)] sm:p-6">
+              <div className="flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-500">
+                <span className="border border-[#ead9a8] bg-[#fff9ed] px-3 py-2">1 Buyer</span>
+                <span className="border border-[#ead9a8] bg-[#fff9ed] px-3 py-2">2 Address</span>
+                <span className="border border-[#ead9a8] bg-[#fff9ed] px-3 py-2">3 Payment</span>
+                <span className="border border-[#ead9a8] bg-[#fff9ed] px-3 py-2">4 Review</span>
+              </div>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <label className="grid gap-2 text-sm font-bold">
+                  Full name
+                  <input required value={form.fullName} onChange={(event) => updateForm("fullName", event.target.value)} className="min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+                </label>
+                <label className="grid gap-2 text-sm font-bold">
+                  Phone number
+                  <input required value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} className="min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+                </label>
+              </div>
+              <label className="grid gap-2 text-sm font-bold">
+                Email
+                <input required type="email" value={form.email} onChange={(event) => updateForm("email", event.target.value)} className="min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+              </label>
+              <div className="border-t border-neutral-100 pt-5">
+                <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#b78a1f]">Complete delivery address</p>
+                <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                  <label className="grid gap-2 text-sm font-bold">
+                    House No. / Unit / Floor
+                    <input required value={form.houseUnit} onChange={(event) => updateForm("houseUnit", event.target.value)} placeholder="Ex. Unit 2B, Blk 5 Lot 8" className="min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+                  </label>
+                  <label className="grid gap-2 text-sm font-bold">
+                    Street / Subdivision / Building
+                    <input required value={form.street} onChange={(event) => updateForm("street", event.target.value)} placeholder="Street, village, building name" className="min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+                  </label>
+                  <label className="grid gap-2 text-sm font-bold">
+                    Barangay
+                    <input required value={form.barangay} onChange={(event) => updateForm("barangay", event.target.value)} className="min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+                  </label>
+                  <label className="grid gap-2 text-sm font-bold">
+                    City / Municipality
+                    <input required value={form.city} onChange={(event) => updateForm("city", event.target.value)} className="min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+                  </label>
+                  <label className="grid gap-2 text-sm font-bold">
+                    Province
+                    <input required value={form.province} onChange={(event) => updateForm("province", event.target.value)} className="min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+                  </label>
+                  <label className="grid gap-2 text-sm font-bold">
+                    Postal Code
+                    <input required value={form.postalCode} onChange={(event) => updateForm("postalCode", event.target.value)} className="min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+                  </label>
+                </div>
+                <label className="mt-5 grid gap-2 text-sm font-bold">
+                  Landmark / Rider Delivery Notes
+                  <input value={form.landmark} onChange={(event) => updateForm("landmark", event.target.value)} placeholder="Nearby landmark, gate color, or delivery instruction" className="min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+                </label>
+              </div>
+              <label className="grid gap-2 text-sm font-bold">
+                Payment method
+                <select value={form.payment} onChange={(event) => updateForm("payment", event.target.value)} className="min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]">
+                  <option>GCash</option>
+                  <option>Bank Transfer</option>
+                  <option>Maya</option>
+                </select>
+              </label>
+              <PaymentQrBox method={form.payment} />
+              <label className="grid gap-2 text-sm font-bold">
+                Order notes
+                <textarea value={form.notes} onChange={(event) => updateForm("notes", event.target.value)} placeholder="Optional order notes" className="min-h-24 min-w-0 border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+              </label>
+
+              <div className="border border-[#ead9a8]/70 bg-[#fff9ed] p-3 sm:p-4">
+                <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#b78a1f]">Review before placing order</p>
+                <p className="mt-2 text-sm leading-6 text-neutral-600">Please confirm your items, selected colors, delivery address, and payment method before submitting.</p>
+                <label className="mt-4 flex items-start gap-3 text-sm font-semibold leading-6">
+                  <input required type="checkbox" checked={confirmedReview} onChange={(event) => setConfirmedReview(event.target.checked)} className="mt-1 h-4 w-4 accent-neutral-950" />
+                  I confirm that my items, colors, address, and payment method are correct.
+                </label>
+              </div>
+
+              <button type="submit" disabled={!confirmedReview} className="bg-neutral-950 px-6 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#9f7418] disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500">
+                Place Order
+              </button>
+            </form>
+
+            <aside id="order-summary" className="h-fit border border-[#ead9a8] bg-white p-5 sm:p-6">
+              <h3 className="text-xl font-bold">Review Your Order</h3>
+              <div className="mt-5 grid gap-4">
+                {cartItems.map((item) => (
+                  <div key={item.cartKey || item.id} className="grid grid-cols-[64px_1fr] gap-3 border-b border-neutral-100 pb-4 sm:flex">
+                    <img src={item.image} alt={item.name} className="h-16 w-16 object-cover" />
+                    <div className="flex-1">
+                      <p className="text-sm font-bold leading-tight">{item.name}</p>
+                      <p className="mt-1 text-xs text-neutral-500">Color: {item.selectedColor || getDefaultColor(item)}</p>
+                      <p className="mt-1 text-xs text-neutral-500">Qty {item.quantity}</p>
+                    </div>
+                    <p className="col-span-2 text-sm font-bold sm:col-span-1">{formatCurrency(getDiscountedPrice(item) * item.quantity)}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 grid gap-3 text-sm">
+                <div className="flex justify-between"><span className="text-neutral-600">Subtotal</span><span className="font-semibold">{formatCurrency(subtotal)}</span></div>
+                <div className="flex justify-between"><span className="text-neutral-600">Delivery</span><span className="font-semibold">{formatCurrency(deliveryFee)}</span></div>
+                <div className="mt-2 flex justify-between border-t border-[#ead9a8] pt-4 text-lg font-bold"><span>Total</span><span>{formatCurrency(total)}</span></div>
+              </div>
+            </aside>
+
+            <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#ead9a8] bg-white/95 px-4 py-3 shadow-[0_-14px_35px_rgba(17,17,17,0.12)] backdrop-blur lg:hidden">
+              <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-500">Order Total</p>
+                  <p className="text-lg font-bold">{formatCurrency(total)}</p>
+                </div>
+                <a href="#order-summary" className="bg-neutral-950 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-white">Review</a>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+
+function TrackOrderSection({ orders, latestOrder }) {
+  const [reference, setReference] = useState(latestOrder?.reference ?? "");
+  const normalizedReference = reference.trim().toUpperCase();
+  const order = orders.find((item) => item.reference.toUpperCase() === normalizedReference) || (latestOrder?.reference === normalizedReference ? latestOrder : null);
+  const statusSteps = ["Pending", "Paid", "Preparing", "Shipped", "Completed"];
+  const activeIndex = order ? Math.max(0, statusSteps.indexOf(order.status === "Paid" && order.paymentChecked ? "Preparing" : order.status)) : -1;
+
+  useEffect(() => {
+    if (latestOrder?.reference) setReference(latestOrder.reference);
+  }, [latestOrder?.reference]);
+
+  return (
+    <section id="track" className="border-t border-[#ead9a8]/70 bg-white py-16">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 max-w-2xl">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Track Order</p>
+          <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Check Your Order Update</h2>
+          <p className="mt-3 text-sm leading-6 text-neutral-600">Enter your order reference number to see payment and preparation updates. For this prototype, tracking is saved in this browser.</p>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+          <form className="h-fit border border-[#ead9a8]/70 bg-[#fff9ed] p-5 shadow-[0_18px_45px_rgba(17,17,17,0.06)]" onSubmit={(event) => event.preventDefault()}>
+            <label className="grid gap-2 text-sm font-bold">
+              Order Reference
+              <input value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} placeholder="Ex. TGS-123456" className="min-w-0 border border-neutral-200 bg-white px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" />
+            </label>
+            {latestOrder?.reference && <button type="button" onClick={() => setReference(latestOrder.reference)} className="mt-4 border border-neutral-950 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] transition hover:bg-neutral-950 hover:text-white">Use Latest Order</button>}
+          </form>
+
+          <div className="border border-[#ead9a8]/70 bg-white p-5 shadow-[0_18px_45px_rgba(17,17,17,0.06)]">
+            {!order ? (
+              <div className="py-6 text-center">
+                <p className="text-lg font-bold">No order found yet.</p>
+                <p className="mt-2 text-sm leading-6 text-neutral-600">Check the reference number from your order confirmation and try again.</p>
+              </div>
+            ) : (
+              <div>
+                <div className="flex flex-col justify-between gap-4 border-b border-neutral-100 pb-4 sm:flex-row sm:items-start">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#b78a1f]">{order.reference}</p>
+                    <h3 className="mt-2 text-xl font-bold">{getOrderStatusMessage(order)}</h3>
+                    <p className="mt-2 text-sm text-neutral-500">Placed {formatOrderDate(order.createdAt)}</p>
+                  </div>
+                  <span className="w-fit border border-[#b78a1f] bg-[#fff8e6] px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#8a6412]">{order.paymentChecked ? "Payment Received" : order.status}</span>
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-5">
+                  {statusSteps.map((step, index) => (
+                    <div key={step} className={"border p-3 text-center text-xs font-bold uppercase tracking-[0.12em] " + (index <= activeIndex ? "border-[#b78a1f] bg-[#fff8e6] text-[#8a6412]" : "border-neutral-200 bg-white text-neutral-400")}>
+                      {step}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-5 grid gap-4 text-sm text-neutral-600 sm:grid-cols-2">
+                  <p><span className="font-semibold text-neutral-950">Buyer:</span> {order.buyer.fullName}</p>
+                  <p><span className="font-semibold text-neutral-950">Payment:</span> {order.paymentMethod}</p>
+                  <p><span className="font-semibold text-neutral-950">Total:</span> {formatCurrency(order.total)}</p>
+                  <p><span className="font-semibold text-neutral-950">Items:</span> {order.items.reduce((sum, item) => sum + item.quantity, 0)} item(s)</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HowToOrderSection() {
+  const steps = [
+    ["Choose your bag", "Browse the collection, select a color, and add your preferred pieces to your bag."],
+    ["Complete buyer details", "Enter your contact information, full delivery address, and preferred payment method."],
+    ["Wait for confirmation", "The Grace Shop confirms stock and delivery details. Buyers can scan or save the selected payment QR code before placing an order."],
+    ["Prepare for delivery", "Once confirmed, your order is packed carefully and scheduled for delivery."],
+  ];
+
+  return (
+    <section id="how-to-order" className="border-t border-[#ead9a8]/70 bg-white py-16">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 max-w-2xl">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">How to Order</p>
+          <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Simple, Confirmed, and Personal</h2>
+          <p className="mt-3 text-sm leading-6 text-neutral-600">Every order is reviewed before payment instructions are sent, so buyers know the selected bag, color, stock, and delivery details are correct.</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-4">
+          {steps.map(([title, copy], index) => (
+            <div key={title} className="border border-[#ead9a8]/70 bg-[#fff9ed] p-5">
+              <span className="grid h-9 w-9 place-items-center bg-neutral-950 text-sm font-bold text-white">{index + 1}</span>
+              <h3 className="mt-5 text-lg font-bold">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-neutral-600">{copy}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PolicySection() {
+  const policies = [
+    ["Shipping", "Orders are packed after confirmation. Delivery fees and schedules are confirmed through phone or email before payment instructions are finalized."],
+    ["Returns & Exchange", "Exchange requests are reviewed for wrong item, wrong color, or confirmed product concern. Items must remain unused, complete, and reported promptly after delivery."],
+    ["Payments", "GCash, Maya, and bank transfer payments are handled through the QR code shown at checkout. Buyers should send proof of payment after placing an order."],
+    ["Privacy", "Buyer contact details and delivery addresses are collected only to confirm, process, and deliver orders from The Grace Shop."],
+  ];
+
+  return (
+    <section id="policies" className="border-t border-[#ead9a8]/70 bg-[#fff9ed] py-16">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 max-w-2xl">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Store Policies</p>
+          <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Clear Details Before You Order</h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {policies.map(([title, copy]) => (
+            <article key={title} className="border border-[#ead9a8]/70 bg-white p-5 shadow-[0_18px_45px_rgba(17,17,17,0.05)]">
+              <h3 className="text-lg font-bold">{title}</h3>
+              <p className="mt-3 text-sm leading-6 text-neutral-600">{copy}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FAQSection() {
+  const faqs = [
+    ["Is online payment connected?", "A real payment gateway is not connected yet. Buyers choose GCash, Bank Transfer, or Maya, then scan or save the matching QR code shown at checkout."],
+    ["Can customers search and filter bags?", "Yes. The shop includes search and category filters for tote bags, shoulder bags, sling bags, backpacks, and travel bags."],
+    ["Are the bags ready on hand?", "Stock availability is shown on each product. If a bag is sold out, it cannot be added to your order."],
+    ["How does delivery work?", "The checkout adds a delivery fee and collects complete address details. The Grace Shop confirms the schedule before payment instructions are finalized."],
+  ];
+
+  return (
+    <section id="faq" className="border-t border-[#ead9a8]/70 bg-white py-16">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">FAQ</p>
+        <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Questions Before Checkout</h2>
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          {faqs.map(([question, answer]) => (
+            <details key={question} className="border border-neutral-200 bg-[#fff9ed] p-5">
+              <summary className="cursor-pointer text-lg font-bold">{question}</summary>
+              <p className="mt-3 text-sm leading-6 text-neutral-600">{answer}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ContactSection() {
+  return (
+    <section id="contact" className="border-t border-[#ead9a8]/70 bg-[#fff9ed] py-16">
+      <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[1fr_380px] lg:px-8">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Contact</p>
+          <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Let Us Help With Your Next Bag</h2>
+          <form className="mt-7 grid gap-4 border border-[#ead9a8]/70 bg-white shadow-[0_18px_45px_rgba(17,17,17,0.06)] p-6" onSubmit={(event) => event.preventDefault()}>
+            <input className="border border-neutral-200 px-4 py-3 outline-none transition focus:border-[#b78a1f]" placeholder="Full name" aria-label="Full name" />
+            <input className="border border-neutral-200 px-4 py-3 outline-none transition focus:border-[#b78a1f]" placeholder="Email address" aria-label="Email address" />
+            <textarea className="min-h-32 min-w-0 border border-neutral-200 px-4 py-3 outline-none transition focus:border-[#b78a1f]" placeholder="Message" aria-label="Message" />
+            <button type="submit" className="w-fit bg-neutral-950 px-6 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#9f7418]">Send Message</button>
+          </form>
+        </div>
+        <aside className="h-fit border border-[#ead9a8] bg-white p-6">
+          <img src={logo} alt="TGS logo" className="h-20 w-20 object-contain" />
+          <h3 className="mt-4 text-2xl font-bold">The Grace Shop</h3>
+          <p className="mt-4 text-sm leading-7 text-neutral-600">
+            Email: thegraceshopcainta@gmail.com<br />
+            Phone: 09524804413<br />
+            Hours: Monday to Sunday, 10 AM to 8 PM
+          </p>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+
+function AdminLoginPanel({ onLogin }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const submitLogin = (event) => {
+    event.preventDefault();
+    if (password === adminPassword) {
+      sessionStorage.setItem(adminSessionKey, "true");
+      setError("");
+      setPassword("");
+      onLogin();
+      return;
+    }
+    setError("Incorrect admin password.");
+  };
+
+  return (
+    <section id="admin" className="border-t border-[#ead9a8]/70 bg-[#fff9ed] py-16">
+      <div className="mx-auto w-full max-w-md px-4 sm:px-6 lg:px-8">
+        <form onSubmit={submitLogin} className="border border-[#ead9a8]/70 bg-white p-5 shadow-[0_18px_45px_rgba(17,17,17,0.06)] sm:p-6">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Staff Access</p>
+          <h2 className="mt-2 font-serif text-3xl font-bold">Admin Login</h2>
+          <p className="mt-3 text-sm leading-6 text-neutral-600">Enter the staff password to manage orders, products, stock, discounts, colors, and product details.</p>
+          <label className="mt-6 grid gap-2 text-sm font-bold">
+            Password
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f]" autoComplete="current-password" />
+          </label>
+          {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
+          <button type="submit" className="mt-5 w-full bg-neutral-950 px-6 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#9f7418]">Unlock Admin</button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+function AdminDashboard({ orders, setOrders, productsCatalog, setProductsCatalog, onLogout }) {
+  return (
+    <div id="admin">
+      <section className="border-t border-[#ead9a8]/70 bg-neutral-950 py-8 text-white">
+        <div className="mx-auto flex w-full max-w-7xl flex-col justify-between gap-4 px-4 sm:px-6 md:flex-row md:items-center lg:px-8">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#d8bd6a]">Admin Dashboard</p>
+            <h2 className="mt-2 font-serif text-3xl font-bold">The Grace Shop Control Room</h2>
+          </div>
+          <button type="button" onClick={onLogout} className="w-fit border border-white/30 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white hover:text-neutral-950">Logout</button>
+        </div>
+      </section>
+      <AdminOrdersPanel orders={orders} setOrders={setOrders} />
+      <AdminPanel productsCatalog={productsCatalog} setProductsCatalog={setProductsCatalog} />
+    </div>
+  );
+}
+
+function AdminOrdersPanel({ orders, setOrders }) {
+  const [orderFilter, setOrderFilter] = useState("All");
+  const filterOptions = ["All", "Awaiting Payment", "Payment Received", "Preparing", "Shipped", "Completed", "Cancelled"];
+
+  const updateOrder = (reference, updates) => {
+    setOrders((current) => current.map((order) => order.reference === reference ? { ...order, ...updates, updatedAt: new Date().toISOString() } : order));
+  };
+
+  const markPaymentReceived = (reference) => {
+    updateOrder(reference, { paymentChecked: true, status: "Preparing" });
+  };
+
+  const clearOrders = () => {
+    if (!window.confirm("Clear all saved orders from this browser?")) return;
+    setOrders([]);
+  };
+
+  const visibleOrders = orders.filter((order) => {
+    if (orderFilter === "All") return true;
+    if (orderFilter === "Awaiting Payment") return !order.paymentChecked && order.status === "Pending";
+    if (orderFilter === "Payment Received") return Boolean(order.paymentChecked);
+    return order.status === orderFilter;
+  });
+
+  return (
+    <section id="orders" className="border-t border-[#ead9a8]/70 bg-[#fff9ed] py-16">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Admin Orders</p>
+            <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Customer Orders</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600">Use the payment tabs to review orders. When payment is received, mark it and the buyer tracking update will show “Preparing to ship.”</p>
+          </div>
+          {orders.length > 0 && <button type="button" onClick={clearOrders} className="w-fit border border-neutral-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-neutral-950 hover:text-white">Clear Orders</button>}
+        </div>
+
+        {orders.length > 0 && (
+          <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+            {filterOptions.map((option) => (
+              <button key={option} type="button" onClick={() => setOrderFilter(option)} className={"shrink-0 border px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] transition " + (orderFilter === option ? "border-[#b78a1f] bg-[#b78a1f] text-white" : "border-neutral-200 bg-white text-neutral-700 hover:border-[#b78a1f]")}>{option}</button>
+            ))}
+          </div>
+        )}
+
+        {orders.length === 0 ? (
+          <div className="border border-[#ead9a8]/70 bg-white p-8 text-center shadow-[0_18px_45px_rgba(17,17,17,0.06)]">
+            <p className="text-lg font-bold">No orders yet.</p>
+            <p className="mt-2 text-sm text-neutral-600">New checkout orders will appear here with buyer details, items, payment method, and status.</p>
+          </div>
+        ) : visibleOrders.length === 0 ? (
+          <div className="border border-[#ead9a8]/70 bg-white p-8 text-center shadow-[0_18px_45px_rgba(17,17,17,0.06)]">
+            <p className="text-lg font-bold">No orders in this tab.</p>
+          </div>
+        ) : (
+          <div className="grid gap-5">
+            {visibleOrders.map((order) => (
+              <article key={order.reference} className="border border-[#ead9a8]/70 bg-white p-5 shadow-[0_18px_45px_rgba(17,17,17,0.06)]">
+                <div className="flex flex-col justify-between gap-4 border-b border-neutral-100 pb-4 lg:flex-row lg:items-start">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#b78a1f]">{order.reference}</p>
+                    <h3 className="mt-2 text-xl font-bold">{order.buyer.fullName}</h3>
+                    <p className="mt-1 text-sm text-neutral-500">{formatOrderDate(order.createdAt)}</p>
+                    <p className="mt-2 text-sm font-semibold text-neutral-700">{getOrderStatusMessage(order)}</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:w-[460px]">
+                    <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                      Status
+                      <select value={order.status} onChange={(event) => updateOrder(order.reference, { status: event.target.value })} className="border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-neutral-950 outline-none focus:border-[#b78a1f]">
+                        {orderStatuses.map((status) => <option key={status}>{status}</option>)}
+                      </select>
+                    </label>
+                    <div className="grid gap-2">
+                      <label className="flex items-center gap-3 border border-neutral-200 px-3 py-2 text-sm font-semibold">
+                        <input type="checkbox" checked={Boolean(order.paymentChecked)} onChange={(event) => updateOrder(order.reference, { paymentChecked: event.target.checked, status: event.target.checked ? "Preparing" : "Pending" })} />
+                        Payment received
+                      </label>
+                      <button type="button" onClick={() => markPaymentReceived(order.reference)} disabled={Boolean(order.paymentChecked)} className="border border-neutral-950 px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] transition hover:bg-neutral-950 hover:text-white disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-300">Mark Payment Received</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_1fr_260px]">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">Buyer Information</p>
+                    <div className="mt-3 grid gap-1 text-sm leading-6 text-neutral-600">
+                      <p><span className="font-semibold text-neutral-950">Phone:</span> {order.buyer.phone}</p>
+                      <p><span className="font-semibold text-neutral-950">Email:</span> {order.buyer.email}</p>
+                      <p><span className="font-semibold text-neutral-950">Payment:</span> {order.paymentMethod}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">Delivery Address</p>
+                    <p className="mt-3 text-sm leading-6 text-neutral-600">{order.address}</p>
+                    {order.notes && <p className="mt-2 text-sm leading-6 text-neutral-600"><span className="font-semibold text-neutral-950">Notes:</span> {order.notes}</p>}
+                  </div>
+
+                  <div className="border border-[#ead9a8]/70 bg-[#fff9ed] p-3 sm:p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">Total</p>
+                    <p className="mt-2 text-2xl font-bold">{formatCurrency(order.total)}</p>
+                    <p className="mt-1 text-sm text-neutral-600">Subtotal {formatCurrency(order.subtotal)}</p>
+                    <p className="text-sm text-neutral-600">Delivery {formatCurrency(order.deliveryFee)}</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t border-neutral-100 pt-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">Items Ordered</p>
+                  <div className="mt-3 grid gap-3">
+                    {order.items.map((item) => (
+                      <div key={(item.cartKey || item.id) + item.selectedColor} className="flex items-center gap-3 border border-neutral-100 p-3">
+                        <img src={item.image} alt={item.name} className="h-16 w-16 object-cover" />
+                        <div className="flex-1">
+                          <p className="text-sm font-bold">{item.name}</p>
+                          <p className="mt-1 text-xs text-neutral-500">Color: {item.selectedColor || getDefaultColor(item)} · Qty {item.quantity}</p>
+                        </div>
+                        <p className="text-sm font-bold">{formatCurrency(getDiscountedPrice(item) * item.quantity)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AdminColorManager({ product, onAddColor, onRemoveColor }) {
+  const [newColor, setNewColor] = useState("");
+  const colors = getProductColors(product);
+
+  const submitColor = (event) => {
+    event.preventDefault();
+    const color = newColor.trim();
+    if (!color) return;
+    onAddColor(product.id, color);
+    setNewColor("");
+  };
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap gap-2">
+        {colors.map((color) => (
+          <span key={color} className="inline-flex items-center gap-2 border border-[#ead9a8] bg-[#fff9ed] px-3 py-2 text-sm font-semibold text-neutral-800">
+            {color}
+            <button type="button" onClick={() => onRemoveColor(product.id, color)} disabled={colors.length <= 1} title={colors.length <= 1 ? "Keep at least one color" : "Remove color"} className="grid h-5 w-5 place-items-center border border-neutral-300 text-xs font-bold leading-none transition hover:border-red-500 hover:text-red-600 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-300">
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <form onSubmit={submitColor} className="grid gap-2 sm:grid-cols-[1fr_auto]">
+        <input value={newColor} onChange={(event) => setNewColor(event.target.value)} placeholder="Add color, ex. Mocha" className="min-w-0 border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-neutral-950 outline-none focus:border-[#b78a1f]" />
+        <button type="submit" className="border border-neutral-950 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] transition hover:bg-neutral-950 hover:text-white">Add Color</button>
+      </form>
+    </div>
+  );
+}
+
+function AdminPanel({ productsCatalog, setProductsCatalog }) {
+  const emptyDraft = {
+    name: "",
+    category: "Tote Bags",
+    price: "",
+    stock: "1",
+    discount: "0",
+    colors: "",
+    description: "",
+    details: "",
+    size: "",
+    material: "",
+    strap: "",
+    closure: "",
+    care: "",
+    image: "",
+  };
+  const [draft, setDraft] = useState(emptyDraft);
+  const [editingId, setEditingId] = useState(null);
+
+  const parseList = (value) =>
+    value
+      .split(/\n|,/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+  const colorsToText = (product) => getProductColors(product).join(", ");
+  const detailsToText = (product) => (Array.isArray(product.details) ? product.details : []).join("\n");
+
+  const saveProducts = (nextProducts) => {
+    setProductsCatalog(nextProducts);
+    localStorage.setItem(productStorageKey, JSON.stringify(nextProducts));
+  };
+
+  const updateProduct = (id, updates) => {
+    saveProducts(productsCatalog.map((product) => product.id === id ? { ...product, ...updates } : product));
+  };
+
+  const updateProductField = (id, field, value) => {
+    if (field === "colors") {
+      const colors = parseList(value);
+      updateProduct(id, { colors, color: colors.join(", ") || "Custom" });
+      return;
+    }
+
+    if (field === "details") {
+      updateProduct(id, { details: parseList(value) });
+      return;
+    }
+
+    if (["price", "stock", "discount"].includes(field)) {
+      updateProduct(id, { [field]: Number(value) });
+      return;
+    }
+
+    updateProduct(id, { [field]: value });
+  };
+
+  const addColorToProduct = (id, color) => {
+    const product = productsCatalog.find((item) => item.id === id);
+    if (!product) return;
+    const colors = getProductColors(product);
+    if (colors.some((item) => item.toLowerCase() === color.toLowerCase())) return;
+    const nextColors = [...colors, color];
+    updateProduct(id, { colors: nextColors, color: nextColors.join(", ") });
+  };
+
+  const removeColorFromProduct = (id, color) => {
+    const product = productsCatalog.find((item) => item.id === id);
+    if (!product) return;
+    const nextColors = getProductColors(product).filter((item) => item !== color);
+    if (!nextColors.length) return;
+    updateProduct(id, { colors: nextColors, color: nextColors.join(", ") });
+  };
+
+  const updateProductSpec = (id, key, value) => {
+    const product = productsCatalog.find((item) => item.id === id);
+    if (!product) return;
+    updateProduct(id, { specs: { ...getProductSpecs(product), [key]: value } });
+  };
+
+  const uploadImage = (id, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => updateProduct(id, { image: reader.result });
+    reader.readAsDataURL(file);
+  };
+
+  const uploadDraftImage = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setDraft((current) => ({ ...current, image: reader.result }));
+    reader.readAsDataURL(file);
+  };
+
+  const addProduct = (event) => {
+    event.preventDefault();
+    const colors = parseList(draft.colors || "Custom");
+    const details = parseList(draft.details || "Graceful everyday carry, Stock and discount can be edited, Product photo can be replaced anytime");
+    const product = {
+      id: "tgs-" + Date.now(),
+      name: draft.name.trim(),
+      category: draft.category,
+      price: Number(draft.price),
+      stock: Number(draft.stock),
+      discount: Number(draft.discount),
+      featured: false,
+      color: colors.join(", ") || "Custom",
+      colors,
+      description: draft.description.trim() || "A Grace Shop bag with polished everyday styling.",
+      details,
+      specs: {
+        size: draft.size.trim() || "Compact everyday size",
+        material: draft.material.trim() || "Premium faux leather",
+        strap: draft.strap.trim() || "Comfortable hand or shoulder carry",
+        closure: draft.closure.trim() || "Secure main compartment",
+        care: draft.care.trim() || "Wipe gently with a soft dry cloth",
+      },
+      image: draft.image || "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=900&q=80",
+    };
+    saveProducts([product, ...productsCatalog]);
+    setDraft(emptyDraft);
+  };
+
+  const resetProducts = () => {
+    localStorage.removeItem(productStorageKey);
+    saveProducts(defaultProducts);
+    setEditingId(null);
+  };
+
+  return (
+    <section id="admin" className="border-t border-[#ead9a8]/70 bg-white py-16">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Admin Panel</p>
+            <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Manage Bag Details</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600">Add new bags from the form below. To keep this page tidy, each product shows a compact summary first; open Edit when you need to update the full details.</p>
+          </div>
+          <button type="button" onClick={resetProducts} className="w-fit border border-neutral-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-neutral-950 hover:text-white">Reset TGS Products</button>
+        </div>
+
+        <form onSubmit={addProduct} className="mb-8 grid gap-4 border border-[#ead9a8]/70 bg-[#fff9ed] p-5 shadow-[0_18px_45px_rgba(17,17,17,0.06)] lg:grid-cols-4">
+          <input required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Bag name" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]" />
+          <select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]">
+            {categories.filter((category) => category !== "All").map((category) => <option key={category}>{category}</option>)}
+          </select>
+          <input required type="number" min="1" value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} placeholder="Price" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]" />
+          <input required type="number" min="0" value={draft.stock} onChange={(event) => setDraft({ ...draft, stock: event.target.value })} placeholder="Stock" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]" />
+          <select value={draft.discount} onChange={(event) => setDraft({ ...draft, discount: event.target.value })} className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]">
+            {discountOptions.map((discount) => <option key={discount} value={discount}>{discount}% discount</option>)}
+          </select>
+          <input value={draft.colors} onChange={(event) => setDraft({ ...draft, colors: event.target.value })} placeholder="Colors, separated by commas" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]" />
+          <input value={draft.size} onChange={(event) => setDraft({ ...draft, size: event.target.value })} placeholder="Size / dimensions" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]" />
+          <input value={draft.material} onChange={(event) => setDraft({ ...draft, material: event.target.value })} placeholder="Material" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]" />
+          <input value={draft.strap} onChange={(event) => setDraft({ ...draft, strap: event.target.value })} placeholder="Strap type" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]" />
+          <input value={draft.closure} onChange={(event) => setDraft({ ...draft, closure: event.target.value })} placeholder="Closure" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]" />
+          <input value={draft.care} onChange={(event) => setDraft({ ...draft, care: event.target.value })} placeholder="Care instructions" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]" />
+          <input type="file" accept="image/*" onChange={(event) => uploadDraftImage(event.target.files?.[0])} className="min-w-0 border border-neutral-200 bg-white px-4 py-3 text-sm" />
+          <button type="submit" className="bg-neutral-950 px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#9f7418]">Add Bag</button>
+          <textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Short product description" className="min-h-24 min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f] lg:col-span-2" />
+          <textarea value={draft.details} onChange={(event) => setDraft({ ...draft, details: event.target.value })} placeholder="Product details, one per line" className="min-h-24 min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f] lg:col-span-2" />
+        </form>
+
+        <div className="grid gap-4">
+          {productsCatalog.map((product) => {
+            const isEditing = editingId === product.id;
+            const hasDiscount = Number(product.discount ?? 0) > 0;
+            return (
+              <article key={product.id} className="border border-[#ead9a8]/70 bg-white p-4 shadow-[0_18px_45px_rgba(17,17,17,0.06)]">
+                <div className="grid gap-4 sm:grid-cols-[92px_1fr_auto] sm:items-center">
+                  <img src={product.image} alt={product.name} className="h-28 w-full object-cover sm:h-24" />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#b78a1f]">{product.category}</p>
+                      <span className={"border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] " + getStockClasses(product.stock)}>{getStockLabel(product.stock)}</span>
+                      {hasDiscount && <span className="bg-[#b78a1f] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white">-{product.discount}%</span>}
+                    </div>
+                    <h3 className="mt-2 truncate text-lg font-bold">{product.name}</h3>
+                    <p className="mt-1 text-sm text-neutral-500">{formatCurrency(getDiscountedPrice(product))} · Stock {product.stock ?? 0} · {colorsToText(product)}</p>
+                  </div>
+                  <button type="button" onClick={() => setEditingId(isEditing ? null : product.id)} aria-label={(isEditing ? "Close editor for " : "Edit ") + product.name} title={(isEditing ? "Close editor" : "Edit details")} className="grid h-11 w-11 place-items-center border border-neutral-200 text-lg font-bold transition hover:border-[#b78a1f] hover:text-[#9f7418]">
+                    {isEditing ? "×" : "✎"}
+                  </button>
+                </div>
+
+                {isEditing && (
+                  <div className="mt-5 border-t border-neutral-100 pt-5">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                        Bag Name
+                        <input value={product.name} onChange={(event) => updateProductField(product.id, "name", event.target.value)} className="border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-neutral-950 outline-none focus:border-[#b78a1f]" />
+                      </label>
+                      <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                        Category
+                        <select value={product.category} onChange={(event) => updateProductField(product.id, "category", event.target.value)} className="border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-neutral-950 outline-none focus:border-[#b78a1f]">
+                          {categories.filter((category) => category !== "All").map((category) => <option key={category}>{category}</option>)}
+                        </select>
+                      </label>
+                      <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                        Price
+                        <input type="number" min="1" value={product.price ?? 0} onChange={(event) => updateProductField(product.id, "price", event.target.value)} className="border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-neutral-950 outline-none focus:border-[#b78a1f]" />
+                      </label>
+                      <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                        Stock
+                        <input type="number" min="0" value={product.stock ?? 0} onChange={(event) => updateProductField(product.id, "stock", event.target.value)} className="border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-neutral-950 outline-none focus:border-[#b78a1f]" />
+                      </label>
+                    </div>
+
+                    <div className="mt-4 grid gap-4 md:grid-cols-[180px_1fr]">
+                      <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                        Discount
+                        <select value={product.discount ?? 0} onChange={(event) => updateProductField(product.id, "discount", event.target.value)} className="border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-neutral-950 outline-none focus:border-[#b78a1f]">
+                          {discountOptions.map((discount) => <option key={discount} value={discount}>{discount}%</option>)}
+                        </select>
+                      </label>
+                      <div className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                        Color Options
+                        <AdminColorManager product={product} onAddColor={addColorToProduct} onRemoveColor={removeColorFromProduct} />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-4 border border-neutral-100 bg-[#fffdf8] p-4" aria-label="Product Specs Editor">
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#b78a1f]">Product Specs</p>
+                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                        {Object.entries(getProductSpecs(product)).map(([key, value]) => (
+                          <label key={key} className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                            {specLabels[key] ?? key}
+                            <input value={value} onChange={(event) => updateProductSpec(product.id, key, event.target.value)} className="border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-neutral-950 outline-none focus:border-[#b78a1f]" />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <label className="mt-4 grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                      Product Photo
+                      <input type="file" accept="image/*" onChange={(event) => uploadImage(product.id, event.target.files?.[0])} className="border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal" />
+                    </label>
+
+                    <label className="mt-4 grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                      Product Description
+                      <textarea value={product.description ?? ""} onChange={(event) => updateProductField(product.id, "description", event.target.value)} className="min-h-24 border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-neutral-950 outline-none focus:border-[#b78a1f]" />
+                    </label>
+
+                    <label className="mt-4 grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                      Product Details
+                      <textarea value={detailsToText(product)} onChange={(event) => updateProductField(product.id, "details", event.target.value)} placeholder="One detail per line" className="min-h-28 border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-neutral-950 outline-none focus:border-[#b78a1f]" />
+                    </label>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="bg-neutral-950 py-10 text-white">
+      <div className="mx-auto flex w-full max-w-7xl flex-col justify-between gap-6 px-4 sm:px-6 md:flex-row md:items-center lg:px-8">
+        <div>
+          <p className="text-xl font-black tracking-[0.24em]">TGS</p>
+          <p className="mt-2 text-sm text-white/60">Style with Grace</p>
+        </div>
+        <p className="text-sm text-white/60">Own-brand fashion bags for graceful everyday style.</p>
+      </div>
+    </footer>
+  );
+}
+
+export default function App() {
+  const [routePath, setRoutePath] = useState(() => window.location.pathname);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [search, setSearch] = useState("");
+  const [productsCatalog, setProductsCatalog] = useState(readSavedProducts);
+  const [cartItems, setCartItems] = useState(readSavedCart);
+  const [orders, setOrders] = useState(readSavedOrders);
+  const [adminUnlocked, setAdminUnlocked] = useState(readAdminSession);
+  const [notice, setNotice] = useState("");
+  const [orderPlaced, setOrderPlaced] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+
+  useEffect(() => {
+    const syncRoute = () => setRoutePath(window.location.pathname);
+    window.addEventListener("popstate", syncRoute);
+    return () => window.removeEventListener("popstate", syncRoute);
+  }, []);
+
+  const isAdminRoute = routePath === "/admin";
+
+  const navigatePath = (path) => {
+    window.history.pushState({}, "", path);
+    setRoutePath(path);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    localStorage.setItem(cartStorageKey, JSON.stringify(cartItems));
+  }, [cartItems]);
+
+  useEffect(() => {
+    localStorage.setItem(orderStorageKey, JSON.stringify(orders));
+  }, [orders]);
+
+  const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
+
+  const filteredProducts = useMemo(() => {
+    return productsCatalog.filter((product) => {
+      const searchText = (product.name + " " + product.category + " " + product.color).toLowerCase();
+      const matchesSearch = searchText.includes(search.toLowerCase());
+      const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [productsCatalog, search, selectedCategory]);
+
+  const addToCart = (product, selectedColor = getDefaultColor(product)) => {
+    if (product.stock <= 0) {
+      setNotice(product.name + " is currently sold out");
+      window.setTimeout(() => setNotice(""), 1800);
+      return;
+    }
+
+    const colorChoice = selectedColor || getDefaultColor(product);
+    const cartKey = getCartKey(product, colorChoice);
+    let didAdd = false;
+    setCartItems((items) => {
+      const existing = items.find((item) => (item.cartKey || getCartKey(item, item.selectedColor || getDefaultColor(item))) === cartKey);
+      if (existing) {
+        if (existing.quantity >= product.stock) return items;
+        didAdd = true;
+        return items.map((item) => (item.cartKey || getCartKey(item, item.selectedColor || getDefaultColor(item))) === cartKey ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+      didAdd = true;
+      return [...items, { ...product, cartKey, selectedColor: colorChoice, quantity: 1 }];
+    });
+    setNotice(didAdd ? product.name + " in " + colorChoice + " added to bag" : "Only " + product.stock + " available for " + product.name);
+    window.setTimeout(() => setNotice(""), 1800);
+  };
+
+  const increaseItem = (cartKey) => {
+    setCartItems((items) => items.map((item) => (item.cartKey || item.id) === cartKey ? { ...item, quantity: Math.min(item.stock, item.quantity + 1) } : item));
+  };
+
+  const decreaseItem = (cartKey) => {
+    setCartItems((items) => items.map((item) => (item.cartKey || item.id) === cartKey ? { ...item, quantity: Math.max(1, item.quantity - 1) } : item));
+  };
+
+  const removeItem = (cartKey) => {
+    setCartItems((items) => items.filter((item) => (item.cartKey || item.id) !== cartKey));
+  };
+
+
+  const logoutAdmin = () => {
+    sessionStorage.removeItem(adminSessionKey);
+    setAdminUnlocked(false);
+  };
+
+  const placeOrder = (form) => {
+    const stockIssues = cartItems.filter((item) => {
+      const catalogProduct = productsCatalog.find((product) => product.id === item.id);
+      const availableStock = catalogProduct?.stock ?? item.stock ?? 0;
+      return item.quantity > availableStock;
+    });
+
+    if (stockIssues.length > 0) {
+      const firstIssue = stockIssues[0];
+      const availableStock = productsCatalog.find((product) => product.id === firstIssue.id)?.stock ?? 0;
+      setNotice(firstIssue.name + " has only " + availableStock + " left. Please update your cart.");
+      window.setTimeout(() => setNotice(""), 2600);
+      document.getElementById("cart")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    const reference = "TGS-" + Date.now().toString().slice(-6);
+    const subtotal = cartItems.reduce((sum, item) => sum + getDiscountedPrice(item) * item.quantity, 0);
+    const total = subtotal > 0 ? subtotal + deliveryFee : 0;
+    const address = [
+      form.houseUnit,
+      form.street,
+      form.barangay,
+      form.city,
+      form.province,
+      form.postalCode,
+      form.landmark ? "Landmark: " + form.landmark : "",
+    ].filter(Boolean).join(", ");
+    const order = {
+      reference,
+      createdAt: new Date().toISOString(),
+      status: "Pending",
+      paymentChecked: false,
+      paymentMethod: form.payment,
+      buyer: {
+        fullName: form.fullName,
+        phone: form.phone,
+        email: form.email,
+      },
+      address,
+      notes: form.notes,
+      items: cartItems,
+      subtotal,
+      deliveryFee,
+      total,
+    };
+    const nextProducts = productsCatalog.map((product) => {
+      const orderedQuantity = cartItems
+        .filter((item) => item.id === product.id)
+        .reduce((sum, item) => sum + item.quantity, 0);
+      if (!orderedQuantity) return product;
+      return { ...product, stock: Math.max(0, (product.stock ?? 0) - orderedQuantity) };
+    });
+    setProductsCatalog(nextProducts);
+    localStorage.setItem(productStorageKey, JSON.stringify(nextProducts));
+    setOrders((current) => [order, ...current]);
+    setOrderPlaced({ fullName: form.fullName, payment: form.payment, reference, createdAt: order.createdAt });
+    setCartItems([]);
+    localStorage.removeItem(cartStorageKey);
+    setNotice("Order placed successfully. Stock updated.");
+    window.setTimeout(() => setNotice(""), 2400);
+    window.setTimeout(() => {
+      document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
+  };
+
+  if (isAdminRoute) {
+    return (
+      <div className="min-h-screen bg-[#fffdf8] text-neutral-950">
+        {adminUnlocked ? (
+          <AdminDashboard orders={orders} setOrders={setOrders} productsCatalog={productsCatalog} setProductsCatalog={setProductsCatalog} onLogout={logoutAdmin} />
+        ) : (
+          <AdminLoginPanel onLogin={() => setAdminUnlocked(true)} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#fffdf8] text-neutral-950">
+      <header className="sticky top-0 z-50 border-b border-[#ead9a8]/70 bg-white/90 shadow-[0_8px_30px_rgba(17,17,17,0.04)] backdrop-blur">
+        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-3 sm:h-20 sm:px-6 lg:px-8">
+          <button type="button" onClick={() => navigatePath("/home")} className="flex items-center gap-3 text-left" aria-label="TGS home">
+            <img src={logo} alt="TGS logo" className="h-10 w-10 object-contain drop-shadow-sm sm:h-14 sm:w-14" />
+            <div className="leading-none">
+              <p className="text-base font-black tracking-[0.18em] sm:text-xl sm:tracking-[0.22em]">TGS</p>
+              <p className="mt-1 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#b78a1f] sm:text-[10px] sm:tracking-[0.24em]">Style with Grace</p>
+            </div>
+          </button>
+
+          <nav className="hidden items-center gap-8 md:flex" aria-label="Main navigation">
+            {navItems.map((item) => (
+              <a key={item} href={"#" + item.toLowerCase()} className="text-sm font-semibold uppercase tracking-[0.12em] text-neutral-600 transition hover:text-[#b78a1f]">
+                {item}
+              </a>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <a href="#cart" className="relative grid h-10 min-w-10 place-items-center border border-neutral-200 px-2 text-[11px] font-bold tracking-[0.12em] transition hover:border-[#b78a1f] sm:h-11 sm:min-w-11 sm:px-3 sm:text-xs sm:tracking-[0.16em]" aria-label="Cart">
+              BAG
+              {cartCount > 0 && <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-[#b78a1f] px-1 text-[11px] text-white">{cartCount}</span>}
+            </a>
+            <button className="grid h-10 w-12 place-items-center border border-neutral-200 text-[11px] font-bold uppercase tracking-[0.08em] md:hidden" type="button" onClick={() => setMenuOpen(true)} aria-label="Open menu">
+              Menu
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 bg-black/30 md:hidden" onClick={() => setMenuOpen(false)}>
+          <aside className="ml-auto flex h-full w-72 flex-col bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-8 flex items-center justify-between">
+              <img src={logo} alt="TGS logo" className="h-14 w-14 object-contain" />
+              <button className="grid h-10 w-16 place-items-center border border-neutral-200 text-xs font-bold uppercase tracking-[0.1em]" type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu">Close</button>
+            </div>
+            <nav className="grid gap-1" aria-label="Mobile navigation">
+              {navItems.map((item) => (
+                <a key={item} href={"#" + item.toLowerCase()} onClick={() => setMenuOpen(false)} className="border-b border-neutral-100 py-4 text-base font-semibold">{item}</a>
+              ))}
+              <a href="#cart" onClick={() => setMenuOpen(false)} className="border-b border-neutral-100 py-4 text-base font-semibold">Cart</a>
+            </nav>
+          </aside>
+        </div>
+      )}
+
+      {notice && <div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 bg-neutral-950 px-5 py-3 text-sm font-semibold text-white shadow-2xl">{notice}</div>}
+
+      <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addToCart} />
+
+      <main id="home">
+        <section className="mx-auto grid w-full max-w-7xl items-center gap-7 px-4 py-6 sm:px-6 sm:py-10 lg:min-h-[calc(100vh-5rem)] lg:grid-cols-[0.9fr_1.1fr] lg:gap-12 lg:px-8">
+          <div className="max-w-xl pt-4 lg:pt-0">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#b78a1f]">Own-brand fashion bags</p>
+            <h1 className="mt-5 font-serif text-[2.6rem] font-bold leading-[0.95] text-neutral-950 sm:text-6xl sm:leading-[0.92] lg:text-7xl">TGS Bags</h1>
+            <p className="mt-5 text-base leading-7 text-neutral-600 sm:mt-6 sm:text-xl sm:leading-8">Style with Grace. Elegant bags for women who carry confidence beautifully.</p>
+            <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row">
+              <a href="#shop" className="inline-flex items-center justify-center bg-neutral-950 px-6 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#9f7418]">Explore Bags</a>
+              <a href="#about" className="inline-flex items-center justify-center border border-[#d7bd72] bg-white px-6 py-4 text-sm font-bold uppercase tracking-[0.16em] text-neutral-950 transition hover:bg-[#fff8e6]">Our Story</a>
+            </div>
+          </div>
+
+          <div className="relative min-h-[360px] overflow-hidden border border-[#ead9a8] bg-[#f7f0df] shadow-[0_30px_80px_rgba(17,17,17,0.12)] sm:min-h-[560px]">
+            <img src={heroImage} alt="TGS model carrying a blue crocodile-texture handbag" className="absolute inset-0 h-full w-full object-cover" />
+            <div className="absolute inset-x-3 bottom-3 border border-white/70 bg-white p-4 shadow-xl sm:bottom-4 sm:left-6 sm:right-auto sm:w-80 sm:p-5">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#b78a1f]">New collection preview</p>
+              <p className="mt-2 text-sm leading-6 text-neutral-700">A graceful first look at The Grace Shop collection: polished details, refined shapes, and boutique confidence.</p>
+            </div>
+          </div>
+        </section>
+
+        <TrustStrip />
+
+        <section id="shop" className="border-y border-[#ead9a8]/70 bg-[#fff9ed] py-16">
+          <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Shop The Grace Shop</p>
+                <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">A Graceful Collection, Ready to Carry</h2>
+              </div>
+              <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full border border-[#ead9a8]/70 bg-white shadow-[0_18px_45px_rgba(17,17,17,0.06)] px-4 py-3 text-sm outline-none transition focus:border-[#b78a1f] md:w-72" placeholder="Search bags" aria-label="Search products" />
+            </div>
+
+            <div className="mb-8 flex gap-2 overflow-x-auto pb-2">
+              {categories.map((category) => (
+                <button key={category} type="button" onClick={() => setSelectedCategory(category)} className={"shrink-0 border px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] transition " + (selectedCategory === category ? "border-[#b78a1f] bg-[#b78a1f] text-white" : "border-neutral-200 bg-white text-neutral-700 hover:border-[#b78a1f]")}>{category}</button>
+              ))}
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-7">
+              {filteredProducts.map((product) => <ProductCard key={product.id} product={product} onAdd={addToCart} onView={setSelectedProduct} />)}
+            </div>
+            {filteredProducts.length === 0 && <div className="border border-[#ead9a8]/70 bg-white shadow-[0_18px_45px_rgba(17,17,17,0.06)] p-8 text-center text-neutral-600">No bags matched your search.</div>}
+          </div>
+        </section>
+
+        <CartSection cartItems={cartItems} onIncrease={increaseItem} onDecrease={decreaseItem} onRemove={removeItem} />
+
+        <CheckoutSection cartItems={cartItems} onPlaceOrder={placeOrder} orderPlaced={orderPlaced} />
+
+        <TrackOrderSection orders={orders} latestOrder={orderPlaced} />
+
+        <HowToOrderSection />
+
+        <PolicySection />
+
+        <section id="about" className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-[0.8fr_1.2fr] lg:px-8">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">About The Grace Shop</p>
+          <div>
+            <h2 className="font-serif text-3xl font-bold sm:text-4xl">Made for Everyday Elegance</h2>
+            <p className="mt-4 max-w-2xl text-base leading-8 text-neutral-600">The Grace Shop creates own-brand bags with polished shapes, soft neutrals, and gold-inspired details for women who want practical carry with graceful style.</p>
+          </div>
+        </section>
+
+        <FAQSection />
+
+        <ContactSection />
+
+
+      </main>
+
+      <Footer />
+    </div>
+  );
+}

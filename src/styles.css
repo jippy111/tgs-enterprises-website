@@ -1,0 +1,68 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #fffdf8;
+  color: #111111;
+}
+
+::selection {
+  background: #d8c7b0;
+  color: #111111;
+}
+
+.focus-ring {
+  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
+.container-page {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+
+.btn-primary {
+  @apply focus-ring inline-flex items-center justify-center gap-2 bg-ink px-5 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-black/80 disabled:cursor-not-allowed disabled:bg-black/40;
+}
+
+.btn-secondary {
+  @apply focus-ring inline-flex items-center justify-center gap-2 border border-ink/15 bg-white px-5 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-ink transition hover:border-ink hover:bg-stoneSoft;
+}
+
+.input {
+  @apply focus-ring w-full border border-ink/15 bg-white px-4 py-3 text-sm text-ink placeholder:text-ink/40;
+}
+
+
+button,
+a,
+input,
+textarea,
+select {
+  border-radius: 0;
+}
+
+img {
+  max-width: 100%;
+}
+
+
+@media (max-width: 420px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  input,
+  textarea,
+  select,
+  button,
+  a {
+    max-width: 100%;
+  }
+}
