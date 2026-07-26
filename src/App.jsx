@@ -2906,7 +2906,6 @@ function CorporateLandingPage({ onNavigate }) {
             <a href="#brands" className="text-neutral-600 hover:text-neutral-950">Brands</a>
             <a href="#leadership" className="text-neutral-600 hover:text-neutral-950">Leadership</a>
             <a href="#information" className="text-neutral-600 hover:text-neutral-950">Company Info</a>
-            <button type="button" onClick={() => onNavigate("/admin")} className="border border-neutral-950 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] hover:bg-neutral-950 hover:text-white">Admin</button>
           </nav>
         </div>
       </header>
