@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { categories, formatCurrency, products as defaultProducts } from "./data/products";
-import { backendEnabled, deleteRecord, fetchTable, upsertRecords } from "./lib/backend";
+import { backendEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signInBackendAdmin, signOutBackendAdmin, upsertRecords } from "./lib/backend";
 
 const navItems = ["Home", "Shop", "Track", "About", "FAQ", "Contact"];
 const logo = "/assets/tgs-logo.jfif";
@@ -286,6 +286,7 @@ function readSavedOrders() {
 }
 
 function readAdminSession() {
+  if (backendEnabled) return hasBackendAdminSession();
   return sessionStorage.getItem(adminSessionKey) === "true";
 }
 
@@ -1001,6 +1002,7 @@ function ContactSection() {
 
 
 function AdminLoginPanel({ onLogin }) {
+  const [email, setEmail] = useState("thegraceshopcainta@gmail.com");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isChecking, setIsChecking] = useState(false);
@@ -1018,24 +1020,31 @@ function AdminLoginPanel({ onLogin }) {
     }
 
     setIsChecking(true);
-    const enteredHash = await hashAdminPassword(password);
-    setIsChecking(false);
+    try {
+      if (backendEnabled) {
+        await signInBackendAdmin(email.trim(), password);
+      } else {
+        const enteredHash = await hashAdminPassword(password);
+        if (enteredHash !== adminPasswordHash) throw new Error("Incorrect admin password.");
+        sessionStorage.setItem(adminSessionKey, "true");
+      }
 
-    if (enteredHash === adminPasswordHash) {
-      sessionStorage.setItem(adminSessionKey, "true");
       localStorage.removeItem(adminLoginLockKey);
       setLock({ attempts: 0, lockedUntil: 0 });
       setError("");
       setPassword("");
       onLogin();
       return;
+    } catch (error) {
+      console.error(error);
     }
+    setIsChecking(false);
 
     const attempts = Number(currentLock.attempts || 0) + 1;
     const nextLock = attempts >= adminMaxLoginAttempts ? { attempts, lockedUntil: Date.now() + adminLockDurationMs } : { attempts, lockedUntil: 0 };
     saveAdminLoginLock(nextLock);
     setLock(nextLock);
-    setError(attempts >= adminMaxLoginAttempts ? "Too many failed attempts. Admin login is locked for 15 minutes." : "Incorrect admin password. Attempts left: " + Math.max(adminMaxLoginAttempts - attempts, 0));
+    setError(attempts >= adminMaxLoginAttempts ? "Too many failed attempts. Admin login is locked for 15 minutes." : "Incorrect admin login. Attempts left: " + Math.max(adminMaxLoginAttempts - attempts, 0));
   };
 
   return (
@@ -1044,8 +1053,12 @@ function AdminLoginPanel({ onLogin }) {
         <form onSubmit={submitLogin} className="border border-[#ead9a8]/70 bg-white p-5 shadow-[0_18px_45px_rgba(17,17,17,0.06)] sm:p-6">
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Secure Staff Access</p>
           <h2 className="mt-2 font-serif text-3xl font-bold">Admin Login</h2>
-          <p className="mt-3 text-sm leading-6 text-neutral-600">Enter the staff password to manage orders, products, stock, discounts, colors, product details, bookings, and income records.</p>
-          <div className="mt-5 border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-800">Launch note: this login now uses a password hash and lockout. For a public website, connect Supabase Auth so admin access is protected by the server.</div>
+          <p className="mt-3 text-sm leading-6 text-neutral-600">Sign in with the authorized admin account to manage orders, products, stock, discounts, colors, product details, bookings, and income records.</p>
+          {backendEnabled && <div className="mt-5 border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold leading-5 text-emerald-800">Admin access is protected by Supabase Auth.</div>}
+          <label className="mt-6 grid gap-2 text-sm font-bold">
+            Email
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={Boolean(isLocked) || isChecking} className="border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f] disabled:bg-neutral-100 disabled:text-neutral-400" autoComplete="email" />
+          </label>
           <label className="mt-6 grid gap-2 text-sm font-bold">
             Password
             <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} disabled={Boolean(isLocked) || isChecking} className="border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f] disabled:bg-neutral-100 disabled:text-neutral-400" autoComplete="current-password" />
@@ -2911,8 +2924,8 @@ function CorporateLandingPage({ onNavigate }) {
         <div className="border border-[#ead9a8]/70 bg-white p-6 shadow-[0_30px_80px_rgba(17,17,17,0.08)]">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">Corporate Snapshot</p>
           <div className="mt-6 grid gap-4">
-            <div className="border border-neutral-100 bg-[#fff9ed] p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#b78a1f]">President</p><p className="mt-2 text-xl font-bold">Jasser Cruz</p></div>
-            <div className="border border-neutral-100 bg-[#fff8fb] p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-pink-500">Secretary</p><p className="mt-2 text-xl font-bold">Grace Cruz</p></div>
+            <div className="border border-neutral-100 bg-[#fff9ed] p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#b78a1f]">President</p><p className="mt-2 text-xl font-bold">Company Executive Office</p></div>
+            <div className="border border-neutral-100 bg-[#fff8fb] p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-pink-500">Secretary</p><p className="mt-2 text-xl font-bold">Corporate Administration</p></div>
             <div className="border border-neutral-100 bg-neutral-50 p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">Current Brands</p><p className="mt-2 text-xl font-bold">2 Active Business Lines</p></div>
           </div>
         </div>
@@ -2966,8 +2979,8 @@ function CorporateLandingPage({ onNavigate }) {
             <h2 className="mt-3 font-serif text-3xl font-bold sm:text-4xl">Built with family leadership and clear operations.</h2>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="border border-neutral-200 bg-white p-5"><p className="text-sm font-bold text-neutral-500">President</p><h3 className="mt-2 text-2xl font-bold">Jasser Cruz</h3><p className="mt-3 text-sm leading-6 text-neutral-600">Oversees business direction, brand growth, customer experience, and operational planning.</p></div>
-            <div className="border border-neutral-200 bg-white p-5"><p className="text-sm font-bold text-neutral-500">Secretary</p><h3 className="mt-2 text-2xl font-bold">Grace Cruz</h3><p className="mt-3 text-sm leading-6 text-neutral-600">Supports documentation, coordination, customer records, and organized administrative workflows.</p></div>
+            <div className="border border-neutral-200 bg-white p-5"><p className="text-sm font-bold text-neutral-500">President</p><h3 className="mt-2 text-2xl font-bold">Executive Leadership</h3><p className="mt-3 text-sm leading-6 text-neutral-600">Oversees business direction, brand growth, customer experience, and operational planning.</p></div>
+            <div className="border border-neutral-200 bg-white p-5"><p className="text-sm font-bold text-neutral-500">Secretary</p><h3 className="mt-2 text-2xl font-bold">Corporate Administration</h3><p className="mt-3 text-sm leading-6 text-neutral-600">Supports documentation, coordination, customer records, and organized administrative workflows.</p></div>
           </div>
         </div>
       </section>
@@ -2981,62 +2994,58 @@ function CorporateLandingPage({ onNavigate }) {
           </div>
           <div className="grid gap-5 md:grid-cols-2">
             <article className="border border-emerald-100 bg-emerald-50 p-6">
-              <div className="overflow-hidden border border-emerald-100 bg-white shadow-[0_18px_45px_rgba(17,17,17,0.08)]">
-                <img src={tgsSecCertificateImage} alt="SEC Certificate of Incorporation for TGS Enterprises Corp." className="h-72 w-full object-contain" />
+              <div className="grid h-72 place-items-center border border-emerald-100 bg-white p-6 text-center shadow-[0_18px_45px_rgba(17,17,17,0.08)]">
+                <p className="max-w-xs text-sm font-semibold leading-6 text-neutral-600">Official document available for verification upon request.</p>
               </div>
               <p className="mt-5 text-xs font-bold uppercase tracking-[0.22em] text-emerald-700">SEC Certificate of Incorporation</p>
               <h3 className="mt-3 text-2xl font-bold">TGS Enterprises Corp.</h3>
               <div className="mt-4 grid gap-2 text-sm leading-6 text-neutral-700">
-                <p><span className="font-semibold text-neutral-950">Company Reg. No.:</span> 2024100174155-01</p>
+                <p><span className="font-semibold text-neutral-950">Registration:</span> Verified corporate registration</p>
                 <p><span className="font-semibold text-neutral-950">Doing business as:</span> The Grace Shop and TGS Bar & Restaurant</p>
                 <p><span className="font-semibold text-neutral-950">Incorporation date:</span> October 21, 2024</p>
                 <p><span className="font-semibold text-neutral-950">Registered with:</span> Securities and Exchange Commission</p>
               </div>
-              <a href={tgsSecCertificateImage} target="_blank" rel="noreferrer" className="mt-5 inline-flex border border-neutral-950 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] hover:bg-neutral-950 hover:text-white">View SEC Certificate</a>
             </article>
             <article className="border border-neutral-200 bg-white p-6">
-              <div className="overflow-hidden border border-neutral-200 bg-white shadow-[0_18px_45px_rgba(17,17,17,0.08)]">
-                <div className="bg-white p-3"><img src={tgsBirRegistrationImage} alt="BIR Certificate of Registration for TGS Enterprises Corp." className="h-72 w-full object-contain grayscale contrast-125 brightness-110 saturate-0" /></div>
+              <div className="grid h-72 place-items-center border border-neutral-200 bg-white p-6 text-center shadow-[0_18px_45px_rgba(17,17,17,0.08)]">
+                <p className="max-w-xs text-sm font-semibold leading-6 text-neutral-600">Tax registration document available for verification upon request.</p>
               </div>
               <p className="mt-5 text-xs font-bold uppercase tracking-[0.22em] text-neutral-500">BIR Certificate of Registration</p>
               <h3 className="mt-3 text-2xl font-bold">TGS Enterprises Corp.</h3>
               <div className="mt-4 grid gap-2 text-sm leading-6 text-neutral-700">
-                <p><span className="font-semibold text-neutral-950">TIN and branch code:</span> 661-811-988-00001</p>
+                <p><span className="font-semibold text-neutral-950">Tax registration:</span> Verified BIR registration</p>
                 <p><span className="font-semibold text-neutral-950">Taxpayer type:</span> Domestic corporation</p>
-                <p><span className="font-semibold text-neutral-950">Registered address:</span> 163 L. Wood St., Pantayin Dolores, Taytay, Rizal</p>
+                <p><span className="font-semibold text-neutral-950">Registered area:</span> Taytay, Rizal</p>
                 <p><span className="font-semibold text-neutral-950">Registration date:</span> October 22, 2024</p>
                 <p><span className="font-semibold text-neutral-950">Trade name:</span> The Grace Shop</p>
               </div>
-              <a href={tgsBirRegistrationImage} target="_blank" rel="noreferrer" className="mt-5 inline-flex border border-neutral-950 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] hover:bg-neutral-950 hover:text-white">View TGS BIR Document</a>
             </article>
             <article className="border border-pink-100 bg-[#fff8fb] p-6">
-              <div className="overflow-hidden border border-pink-100 bg-white">
-                <img src={dtiRegistrationImage} alt="DTI Business Name Registration for Little Jessie Studyo Souvenir Shop" className="h-72 w-full object-contain" />
+              <div className="grid h-72 place-items-center border border-pink-100 bg-white p-6 text-center">
+                <p className="max-w-xs text-sm font-semibold leading-6 text-neutral-600">DTI registration document available for verification upon request.</p>
               </div>
               <p className="mt-5 text-xs font-bold uppercase tracking-[0.22em] text-pink-500">DTI Business Name Registration</p>
               <h3 className="mt-3 text-2xl font-bold">Little Jessie Studyo Souvenir Shop</h3>
               <div className="mt-4 grid gap-2 text-sm leading-6 text-neutral-700">
-                <p><span className="font-semibold text-neutral-950">Registered owner:</span> Grace Sibulo Cruz</p>
-                <p><span className="font-semibold text-neutral-950">Business Name No.:</span> 5950929</p>
+                <p><span className="font-semibold text-neutral-950">Ownership:</span> Registered sole proprietor</p>
+                <p><span className="font-semibold text-neutral-950">Business registration:</span> Verified DTI registration</p>
                 <p><span className="font-semibold text-neutral-950">Validity:</span> March 16, 2024 to March 16, 2029</p>
                 <p><span className="font-semibold text-neutral-950">Scope:</span> National</p>
               </div>
-              <a href={dtiRegistrationImage} target="_blank" rel="noreferrer" className="mt-5 inline-flex border border-neutral-950 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] hover:bg-neutral-950 hover:text-white">View DTI Document</a>
             </article>
             <article className="border border-[#ead9a8]/70 bg-[#fff9ed] p-6">
-              <div className="overflow-hidden border border-[#ead9a8]/70 bg-white shadow-[0_18px_45px_rgba(17,17,17,0.08)]">
-                <div className="bg-white p-3"><img src={birRegistrationImage} alt="BIR Certificate of Registration for Little Jessie Studyo Souvenir Shop" className="h-72 w-full object-contain grayscale contrast-125 brightness-110 saturate-0" /></div>
+              <div className="grid h-72 place-items-center border border-[#ead9a8]/70 bg-white p-6 text-center shadow-[0_18px_45px_rgba(17,17,17,0.08)]">
+                <p className="max-w-xs text-sm font-semibold leading-6 text-neutral-600">Tax registration document available for verification upon request.</p>
               </div>
               <p className="mt-5 text-xs font-bold uppercase tracking-[0.22em] text-[#b78a1f]">BIR Certificate of Registration</p>
               <h3 className="mt-3 text-2xl font-bold">Little Jessie Studyo Souvenir Shop</h3>
               <div className="mt-4 grid gap-2 text-sm leading-6 text-neutral-700">
-                <p><span className="font-semibold text-neutral-950">Taxpayer:</span> Grace Sibulo Cruz</p>
-                <p><span className="font-semibold text-neutral-950">TIN and branch code:</span> 424-596-858-00003</p>
+                <p><span className="font-semibold text-neutral-950">Taxpayer:</span> Registered business owner</p>
+                <p><span className="font-semibold text-neutral-950">Tax registration:</span> Verified BIR registration</p>
                 <p><span className="font-semibold text-neutral-950">Registered office:</span> Revenue District Office No. 046, Cainta-Taytay</p>
                 <p><span className="font-semibold text-neutral-950">Registration date:</span> March 27, 2024</p>
                 <p><span className="font-semibold text-neutral-950">Line of business:</span> Online shop</p>
               </div>
-              <a href={birRegistrationImage} target="_blank" rel="noreferrer" className="mt-5 inline-flex border border-neutral-950 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] hover:bg-neutral-950 hover:text-white">View BIR Document</a>
             </article>
           </div>
         </div>
@@ -3113,7 +3122,7 @@ export default function App() {
       try {
         const [cloudTgsProducts, cloudTgsOrders, cloudLittleJessieProducts, cloudLittleJessieGallery] = await Promise.all([
           fetchTable("tgs_products"),
-          fetchTable("tgs_orders"),
+          hasBackendAdminSession() ? fetchTable("tgs_orders") : Promise.resolve([]),
           fetchTable("little_jessie_products"),
           fetchTable("little_jessie_gallery"),
         ]);
@@ -3170,24 +3179,36 @@ export default function App() {
   }, [orders]);
 
   useEffect(() => {
-    if (!cloudReady || !backendEnabled) return;
+    if (!backendEnabled || !adminUnlocked) return;
+    fetchTable("tgs_orders")
+      .then((cloudOrders) => {
+        if (!Array.isArray(cloudOrders)) return;
+        const nextOrders = cloudOrders.map(fromDbTgsOrder);
+        setOrders(nextOrders);
+        tgsOrderIdsRef.current = nextOrders.map((order) => order.reference);
+      })
+      .catch(console.error);
+  }, [adminUnlocked]);
+
+  useEffect(() => {
+    if (!cloudReady || !backendEnabled || !adminUnlocked) return;
     syncBackendCollection("tgs_products", "id", productsCatalog, tgsProductIdsRef, toDbTgsProduct).catch(console.error);
-  }, [productsCatalog, cloudReady]);
+  }, [productsCatalog, cloudReady, adminUnlocked]);
 
   useEffect(() => {
-    if (!cloudReady || !backendEnabled) return;
+    if (!cloudReady || !backendEnabled || !adminUnlocked) return;
     syncBackendCollection("tgs_orders", "reference", orders, tgsOrderIdsRef, toDbTgsOrder).catch(console.error);
-  }, [orders, cloudReady]);
+  }, [orders, cloudReady, adminUnlocked]);
 
   useEffect(() => {
-    if (!cloudReady || !backendEnabled) return;
+    if (!cloudReady || !backendEnabled || !adminUnlocked) return;
     syncBackendCollection("little_jessie_products", "id", littleJessieProducts, littleJessieProductIdsRef, toDbLittleJessieProduct).catch(console.error);
-  }, [littleJessieProducts, cloudReady]);
+  }, [littleJessieProducts, cloudReady, adminUnlocked]);
 
   useEffect(() => {
-    if (!cloudReady || !backendEnabled) return;
+    if (!cloudReady || !backendEnabled || !adminUnlocked) return;
     syncBackendCollection("little_jessie_gallery", "id", littleJessieGallery, littleJessieGalleryIdsRef, toDbLittleJessieGallery).catch(console.error);
-  }, [littleJessieGallery, cloudReady]);
+  }, [littleJessieGallery, cloudReady, adminUnlocked]);
 
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 
@@ -3245,6 +3266,7 @@ export default function App() {
 
   const logoutAdmin = () => {
     sessionStorage.removeItem(adminSessionKey);
+    signOutBackendAdmin();
     setAdminUnlocked(false);
   };
 
@@ -3305,6 +3327,7 @@ export default function App() {
     setProductsCatalog(nextProducts);
     localStorage.setItem(productStorageKey, JSON.stringify(nextProducts));
     setOrders((current) => [order, ...current]);
+    if (backendEnabled) insertRecord("tgs_orders", toDbTgsOrder(order)).catch(console.error);
     setOrderPlaced({ fullName: form.fullName, payment: form.payment, reference, createdAt: order.createdAt });
     setCartItems([]);
     localStorage.removeItem(cartStorageKey);

@@ -1,7 +1,54 @@
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseAdminSessionKey = "tgs-supabase-admin-session";
 
 export const backendEnabled = Boolean(supabaseUrl && supabaseAnonKey);
+
+export function readBackendAdminSession() {
+  try {
+    const session = JSON.parse(sessionStorage.getItem(supabaseAdminSessionKey) || "{}");
+    if (!session.access_token || !session.expires_at) return null;
+    if (Date.now() >= Number(session.expires_at) * 1000) {
+      sessionStorage.removeItem(supabaseAdminSessionKey);
+      return null;
+    }
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthToken() {
+  return readBackendAdminSession()?.access_token || supabaseAnonKey;
+}
+
+export function hasBackendAdminSession() {
+  return Boolean(readBackendAdminSession());
+}
+
+export function signOutBackendAdmin() {
+  sessionStorage.removeItem(supabaseAdminSessionKey);
+}
+
+export async function signInBackendAdmin(email, password) {
+  if (!backendEnabled) throw new Error("Backend is not configured.");
+  const response = await fetch(supabaseUrl + "/auth/v1/token?grant_type=password", {
+    method: "POST",
+    headers: {
+      apikey: supabaseAnonKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Invalid admin email or password.");
+  }
+
+  const session = await response.json();
+  sessionStorage.setItem(supabaseAdminSessionKey, JSON.stringify(session));
+  return session;
+}
 
 async function supabaseRequest(table, options = {}) {
   if (!backendEnabled) return null;
@@ -11,7 +58,7 @@ async function supabaseRequest(table, options = {}) {
     method,
     headers: {
       apikey: supabaseAnonKey,
-      Authorization: "Bearer " + supabaseAnonKey,
+      Authorization: "Bearer " + getAuthToken(),
       "Content-Type": "application/json",
       Prefer: method === "POST" ? "return=representation" : "return=minimal",
       ...headers,
