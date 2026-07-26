@@ -1002,7 +1002,7 @@ function ContactSection() {
 
 
 function AdminLoginPanel({ onLogin }) {
-  const [email, setEmail] = useState("tgscorp2024@gmail.com");
+  const [email, setEmail] = useState("thegraceshopcainta@gmail.com");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isChecking, setIsChecking] = useState(false);
