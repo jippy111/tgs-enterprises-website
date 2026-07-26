@@ -1181,7 +1181,7 @@ function LittleJessieRentalAdminPanel() {
                 <p className="text-base font-bold">Payment Verification: {paymentStatusLabel}</p>
                 <p className="mt-1">{paymentReviewMessage}</p>
               </div>
-              <div className="mt-4 grid gap-4 text-sm leading-6 text-stone-600 xl:grid-cols-4"><div><p className="font-bold text-stone-950">Customer</p><p>{booking.fullName}</p><p>{booking.mobile}</p><p>{booking.email}</p></div><div><p className="font-bold text-stone-950">Event</p><p>{booking.eventType}</p><p>{booking.venueAddress}</p><p>{booking.paymentMethod}</p><p>Package: {booking.rentalPackage}</p><p>Celebrant: {booking.celebrantName}</p></div><div><p className="font-bold text-stone-950">Payment Review</p><p>Package: {booking.rentalPackage}</p><p>Package price: {booking.packagePrice ? formatCurrency(booking.packagePrice) : "Quote-based"}</p><p>Transportation fee: {formatCurrency(booking.transportationFee ?? 500)}</p><p>Total due: {booking.totalDue ? formatCurrency(booking.totalDue) : "For quotation"}</p><p>Customer selected: {firstPaymentType}</p><p>Expected first payment: {initialPaymentDue ? formatCurrency(initialPaymentDue) : "To be confirmed"}</p><p>Remaining balance: {booking.totalDue ? formatCurrency(balanceAfterInitialPayment) : "To be confirmed"}</p><p>Admin full-payment mark: {booking.fullPaymentReceived || booking.status === "Full Payment Receive" ? "Received" : "Not yet marked"}</p><p>Status: {booking.status}</p>{booking.status === "Cancelled" && <p>Cancellation note: {booking.cancellationNote || "No note added"}</p>}</div></div>
+              <div className="mt-4 grid gap-4 text-sm leading-6 text-stone-600 xl:grid-cols-4"><div><p className="font-bold text-stone-950">Customer</p><p>{booking.fullName}</p><p>{booking.mobile}</p><p>{booking.email}</p></div><div><p className="font-bold text-stone-950">Event</p><p>{booking.eventType}</p><p>{booking.eventLocationArea || "Location area not selected"}</p><p>{booking.venueAddress}</p><p>{booking.paymentMethod}</p><p>Package: {booking.rentalPackage}</p><p>Celebrant: {booking.celebrantName}</p></div><div><p className="font-bold text-stone-950">Payment Review</p><p>Package: {booking.rentalPackage}</p><p>Package price: {booking.packagePrice ? formatCurrency(booking.packagePrice) : "Quote-based"}</p><p>Transportation fee: {formatCurrency(booking.transportationFee ?? 500)}</p><p>Total due: {booking.totalDue ? formatCurrency(booking.totalDue) : "For quotation"}</p><p>Customer selected: {firstPaymentType}</p><p>Expected first payment: {initialPaymentDue ? formatCurrency(initialPaymentDue) : "To be confirmed"}</p><p>Remaining balance: {booking.totalDue ? formatCurrency(balanceAfterInitialPayment) : "To be confirmed"}</p><p>Admin full-payment mark: {booking.fullPaymentReceived || booking.status === "Full Payment Receive" ? "Received" : "Not yet marked"}</p><p>Status: {booking.status}</p>{booking.status === "Cancelled" && <p>Cancellation note: {booking.cancellationNote || "No note added"}</p>}</div></div>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {booking.paymentReceipt && <div className="border border-stone-100 bg-stone-50 p-3"><p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-stone-600">{firstPaymentType === "Full payment" ? "Full Payment Receipt" : "Down Payment Receipt"}</p><img src={booking.paymentReceipt} alt={firstPaymentType === "Full payment" ? "Full payment receipt" : "Down payment receipt"} className="h-32 w-32 object-cover" /></div>}
                 {booking.fullPaymentReceipt && <div className="border border-blue-100 bg-blue-50 p-3"><p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-blue-700">Full Balance Receipt</p><img src={booking.fullPaymentReceipt} alt="Full payment receipt" className="h-32 w-32 object-cover" /></div>}
@@ -2137,6 +2137,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
     eventDate: "",
     eventTime: "",
     eventType: "",
+    eventLocationArea: "Cainta / Taytay",
     venueAddress: "",
     packageNotes: "",
     paymentMethod: "GCash (via QR Code)",
@@ -2395,7 +2396,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
 
     localStorage.setItem(littleJessieRentalStorageKey, JSON.stringify([nextBooking, ...savedBookings]));
     setRentalSaved(true);
-    setRentalMessage("SCHEDULE SUBMITTED. Your reservation code is " + reservationCode + ". Please keep this code for payment follow-up. Reservation is confirmed after admin verifies your " + (rentalBooking.paymentOption === "Full payment" ? "full payment" : "50% down payment plus PHP 500 transportation fee") + ".");
+    setRentalMessage("SCHEDULE SUBMITTED. Your reservation code is " + reservationCode + ". Please keep this code for payment follow-up. Reservation is confirmed after admin verifies your " + (rentalBooking.paymentOption === "Full payment" ? "full payment" : "50% down payment") + ". Transportation fee is based on your selected event location.");
     window.setTimeout(() => document.getElementById("rental-submit-status")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
     setRentalBooking({
       fullName: "",
@@ -2408,6 +2409,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
       eventDate: "",
       eventTime: "",
       eventType: "",
+      eventLocationArea: "Cainta / Taytay",
       venueAddress: "",
       packageNotes: "",
       paymentMethod: "GCash (via QR Code)",
@@ -2485,7 +2487,13 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
   };
   const rentalPackageOptions = rentalBooking.rentalType === "Photobooth" ? ["Photo Standee", "Full Magnetic", "Photo Strip", "Strip Magnet"] : ["Chunky Letter Keychain", "Loop Keychain", "Leather Keychain"];
   const rentalPackagePrice = rentalPackagePrices[rentalBooking.rentalPackage] ?? 0;
-  const rentalTransportationFee = 500;
+  const rentalTransportationFees = {
+    "Cainta / Taytay": 0,
+    "Antipolo / Angono / Pasig / Marikina": 500,
+    "Other Metro Manila areas": 700,
+    "Outside Metro Manila": 1000,
+  };
+  const rentalTransportationFee = rentalTransportationFees[rentalBooking.eventLocationArea] ?? 1000;
   const rentalTotal = rentalPackagePrice + rentalTransportationFee;
   const rentalDownpayment = Math.ceil(rentalTotal * 0.5);
   const rentalInitialPaymentDue = rentalBooking.paymentOption === "Full payment" ? rentalTotal : rentalDownpayment;
@@ -2642,7 +2650,8 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
               </div>
               <div className="mt-6 border border-pink-200 bg-[#fff8fb] p-4 text-sm leading-6 text-pink-700">
                 <p className="font-semibold">No down payment, no reservation.</p>
-                <p>Reservation requires either a 50% down payment or full payment. A PHP 500 transportation fee is included in the checkout total.</p>
+                <p>Reservation requires either a 50% down payment or full payment. Transportation fee is calculated based on the event location.</p>
+                <p>Cainta and Taytay are free. Antipolo, Angono, Pasig, and Marikina are PHP 500. Other Metro Manila areas are PHP 700. Outside Metro Manila is PHP 1,000.</p>
                 <p>Each event is allotted 5 hours.</p>
               </div>
             </div>
@@ -2675,6 +2684,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
                 <label className="text-sm font-semibold">Event Date<input type="date" value={rentalBooking.eventDate} onChange={(event) => updateRentalBooking("eventDate", event.target.value)} required className="mt-2 w-full border border-stone-200 px-3 py-3 text-sm font-normal outline-none focus:border-pink-300" /></label>
                 <label className="text-sm font-semibold">Preferred Event Time<input type="time" value={rentalBooking.eventTime} onChange={(event) => updateRentalBooking("eventTime", event.target.value)} required disabled={rentalDateFullyBooked} className="mt-2 w-full border border-stone-200 px-3 py-3 text-sm font-normal outline-none focus:border-pink-300 disabled:bg-stone-100 disabled:text-stone-400" /></label>
                 <label className="text-sm font-semibold">Event Type<input value={rentalBooking.eventType} onChange={(event) => updateRentalBooking("eventType", event.target.value)} required className="mt-2 w-full border border-stone-200 px-3 py-3 text-sm font-normal outline-none focus:border-pink-300" placeholder="Birthday, school event, baptism" /></label>
+                <label className="text-sm font-semibold">Event Location Area<select value={rentalBooking.eventLocationArea} onChange={(event) => updateRentalBooking("eventLocationArea", event.target.value)} className="mt-2 w-full border border-stone-200 px-3 py-3 text-sm font-normal outline-none focus:border-pink-300"><option>Cainta / Taytay</option><option>Antipolo / Angono / Pasig / Marikina</option><option>Other Metro Manila areas</option><option>Outside Metro Manila</option></select></label>
                 <label className="text-sm font-semibold">Payment Method<select value={rentalBooking.paymentMethod} onChange={(event) => updateRentalBooking("paymentMethod", event.target.value)} className="mt-2 w-full border border-stone-200 px-3 py-3 text-sm font-normal outline-none focus:border-pink-300"><option>GCash (via QR Code)</option><option>Maya (via QR Code)</option><option>MariBank</option><option>GoTyme Bank</option></select></label>
                 <label className="text-sm font-semibold">Payment Option<select value={rentalBooking.paymentOption} onChange={(event) => updateRentalBooking("paymentOption", event.target.value)} className="mt-2 w-full border border-stone-200 px-3 py-3 text-sm font-normal outline-none focus:border-pink-300"><option>50% down payment</option><option>Full payment</option></select></label>
               </div>
@@ -2688,6 +2698,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
                 <div className="mt-3 grid gap-2">
                   <p className="flex justify-between gap-3"><span>Package</span><span className="font-semibold text-stone-950">{rentalBooking.rentalPackage}</span></p>
                   <p className="flex justify-between gap-3"><span>Package price</span><span className="font-semibold text-stone-950">{rentalPackagePrice ? formatCurrency(rentalPackagePrice) : "Quote-based"}</span></p>
+                  <p className="flex justify-between gap-3"><span>Event location area</span><span className="text-right font-semibold text-stone-950">{rentalBooking.eventLocationArea}</span></p>
                   <p className="flex justify-between gap-3"><span>Transportation fee</span><span className="font-semibold text-stone-950">{formatCurrency(rentalTransportationFee)}</span></p>
                   <p className="flex justify-between gap-3 border-t border-pink-100 pt-2"><span>Total</span><span className="font-bold text-stone-950">{rentalPackagePrice ? formatCurrency(rentalTotal) : "For quotation"}</span></p>
                   <p className="flex justify-between gap-3"><span>Payment option</span><span className="font-semibold text-stone-950">{rentalBooking.paymentOption}</span></p>
