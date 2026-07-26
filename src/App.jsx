@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { categories, formatCurrency, products as defaultProducts } from "./data/products";
-import { backendEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signInBackendAdmin, signOutBackendAdmin, upsertRecords } from "./lib/backend";
+import { backendEnabled, deleteRecord, fetchTable, insertRecord, signOutBackendAdmin, upsertRecords } from "./lib/backend";
 
 const navItems = ["Home", "Shop", "Track", "About", "FAQ", "Contact"];
 const logo = "/assets/tgs-logo.jfif";
@@ -286,7 +286,6 @@ function readSavedOrders() {
 }
 
 function readAdminSession() {
-  if (backendEnabled) return hasBackendAdminSession();
   return sessionStorage.getItem(adminSessionKey) === "true";
 }
 
@@ -1002,7 +1001,6 @@ function ContactSection() {
 
 
 function AdminLoginPanel({ onLogin }) {
-  const [email, setEmail] = useState("thegraceshopcainta@gmail.com");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isChecking, setIsChecking] = useState(false);
@@ -1020,14 +1018,11 @@ function AdminLoginPanel({ onLogin }) {
     }
 
     setIsChecking(true);
+    let loginError = "Incorrect admin login.";
     try {
-      if (backendEnabled) {
-        await signInBackendAdmin(email.trim(), password);
-      } else {
-        const enteredHash = await hashAdminPassword(password);
-        if (enteredHash !== adminPasswordHash) throw new Error("Incorrect admin password.");
-        sessionStorage.setItem(adminSessionKey, "true");
-      }
+      const enteredHash = await hashAdminPassword(password);
+      if (enteredHash !== adminPasswordHash) throw new Error("Incorrect admin password.");
+      sessionStorage.setItem(adminSessionKey, "true");
 
       localStorage.removeItem(adminLoginLockKey);
       setLock({ attempts: 0, lockedUntil: 0 });
@@ -1037,6 +1032,8 @@ function AdminLoginPanel({ onLogin }) {
       return;
     } catch (error) {
       console.error(error);
+      loginError = error.message || loginError;
+      setError(loginError);
     }
     setIsChecking(false);
 
@@ -1044,7 +1041,7 @@ function AdminLoginPanel({ onLogin }) {
     const nextLock = attempts >= adminMaxLoginAttempts ? { attempts, lockedUntil: Date.now() + adminLockDurationMs } : { attempts, lockedUntil: 0 };
     saveAdminLoginLock(nextLock);
     setLock(nextLock);
-    setError(attempts >= adminMaxLoginAttempts ? "Too many failed attempts. Admin login is locked for 15 minutes." : "Incorrect admin login. Attempts left: " + Math.max(adminMaxLoginAttempts - attempts, 0));
+    setError(attempts >= adminMaxLoginAttempts ? "Too many failed attempts. Admin login is locked for 15 minutes." : loginError + " Attempts left: " + Math.max(adminMaxLoginAttempts - attempts, 0));
   };
 
   return (
@@ -1053,12 +1050,8 @@ function AdminLoginPanel({ onLogin }) {
         <form onSubmit={submitLogin} className="border border-[#ead9a8]/70 bg-white p-5 shadow-[0_18px_45px_rgba(17,17,17,0.06)] sm:p-6">
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Secure Staff Access</p>
           <h2 className="mt-2 font-serif text-3xl font-bold">Admin Login</h2>
-          <p className="mt-3 text-sm leading-6 text-neutral-600">Sign in with the authorized admin account to manage orders, products, stock, discounts, colors, product details, bookings, and income records.</p>
-          {backendEnabled && <div className="mt-5 border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold leading-5 text-emerald-800">Admin access is protected by Supabase Auth.</div>}
-          <label className="mt-6 grid gap-2 text-sm font-bold">
-            Email
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={Boolean(isLocked) || isChecking} className="border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f] disabled:bg-neutral-100 disabled:text-neutral-400" autoComplete="email" />
-          </label>
+          <p className="mt-3 text-sm leading-6 text-neutral-600">Enter the staff password to manage orders, products, stock, discounts, colors, product details, bookings, and income records.</p>
+          <div className="mt-5 border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-800">Admin access uses a private staff password. Keep this password confidential.</div>
           <label className="mt-6 grid gap-2 text-sm font-bold">
             Password
             <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} disabled={Boolean(isLocked) || isChecking} className="border border-neutral-200 px-4 py-3 font-normal outline-none transition focus:border-[#b78a1f] disabled:bg-neutral-100 disabled:text-neutral-400" autoComplete="current-password" />

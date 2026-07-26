@@ -36,13 +36,21 @@ export async function signInBackendAdmin(email, password) {
     method: "POST",
     headers: {
       apikey: supabaseAnonKey,
+      Authorization: "Bearer " + supabaseAnonKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ email, password }),
   });
 
   if (!response.ok) {
-    throw new Error("Invalid admin email or password.");
+    let message = "Invalid admin email or password.";
+    try {
+      const details = await response.json();
+      message = details.error_description || details.msg || details.message || message;
+    } catch {
+      message = "Admin login request failed. Please check the Supabase URL and publishable key in Vercel.";
+    }
+    throw new Error(message);
   }
 
   const session = await response.json();
