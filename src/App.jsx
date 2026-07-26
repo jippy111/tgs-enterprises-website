@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { categories, formatCurrency, products as defaultProducts } from "./data/products";
+import { backendEnabled, deleteRecord, fetchTable, upsertRecords } from "./lib/backend";
 
 const navItems = ["Home", "Shop", "Track", "About", "FAQ", "Contact"];
 const logo = "/assets/tgs-logo.jfif";
@@ -97,6 +98,126 @@ function readSavedProducts() {
   } catch {
     return defaultProducts;
   }
+}
+
+function toDbTgsProduct(product) {
+  return {
+    id: product.id,
+    name: product.name,
+    category: product.category,
+    price: Number(product.price || 0),
+    discount: Number(product.discount || 0),
+    stock: Number(product.stock || 0),
+    color: product.color || "",
+    colors: getProductColors(product),
+    description: product.description || "",
+    details: Array.isArray(product.details) ? product.details : [],
+    specs: product.specs || {},
+    image: product.image || "",
+    featured: Boolean(product.featured),
+    available: product.available !== false,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function fromDbTgsProduct(product) {
+  return {
+    ...product,
+    featured: Boolean(product.featured),
+    available: product.available !== false,
+    price: Number(product.price || 0),
+    discount: Number(product.discount || 0),
+    stock: Number(product.stock || 0),
+    colors: Array.isArray(product.colors) ? product.colors : [],
+    details: Array.isArray(product.details) ? product.details : [],
+    specs: product.specs || {},
+  };
+}
+
+function toDbTgsOrder(order) {
+  return {
+    reference: order.reference,
+    buyer: order.buyer || {},
+    items: order.items || [],
+    subtotal: Number(order.subtotal || 0),
+    delivery_fee: Number(order.deliveryFee || 0),
+    total: Number(order.total || 0),
+    payment_method: order.paymentMethod || "",
+    payment_receipt: order.paymentReceipt || "",
+    payment_checked: Boolean(order.paymentChecked),
+    status: order.status || "Pending",
+    created_at: order.createdAt || new Date().toISOString(),
+    updated_at: order.updatedAt || new Date().toISOString(),
+  };
+}
+
+function fromDbTgsOrder(order) {
+  return {
+    reference: order.reference,
+    buyer: order.buyer || {},
+    items: Array.isArray(order.items) ? order.items : [],
+    subtotal: Number(order.subtotal || 0),
+    deliveryFee: Number(order.delivery_fee || 0),
+    total: Number(order.total || 0),
+    paymentMethod: order.payment_method || "",
+    paymentReceipt: order.payment_receipt || "",
+    paymentChecked: Boolean(order.payment_checked),
+    status: order.status || "Pending",
+    createdAt: order.created_at,
+    updatedAt: order.updated_at,
+  };
+}
+
+function toDbLittleJessieProduct(product) {
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description || "",
+    price: Number(product.price || 0),
+    discount: Number(product.discount || 0),
+    status: product.status || "Made to Order",
+    image: product.image || "",
+    available: product.available !== false,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function fromDbLittleJessieProduct(product) {
+  return {
+    ...product,
+    price: Number(product.price || 0),
+    discount: Number(product.discount || 0),
+    available: product.available !== false,
+  };
+}
+
+function toDbLittleJessieGallery(item) {
+  return {
+    id: item.id,
+    title: item.title,
+    detail: item.detail || "",
+    image: item.image || "",
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function fromDbLittleJessieGallery(item) {
+  return {
+    id: item.id,
+    title: item.title,
+    detail: item.detail || "",
+    image: item.image || "",
+  };
+}
+
+async function syncBackendCollection(table, primaryKey, items, previousIdsRef, toDb) {
+  if (!backendEnabled) return;
+  const currentIds = items.map((item) => item[primaryKey]).filter(Boolean);
+  const previousIds = previousIdsRef.current || [];
+  const removedIds = previousIds.filter((id) => !currentIds.includes(id));
+  await Promise.all(removedIds.map((id) => deleteRecord(table, primaryKey, id)));
+  if (items.length) await upsertRecords(table, items.map(toDb));
+  previousIdsRef.current = currentIds;
 }
 
 function getStockLabel(stock) {
@@ -2972,11 +3093,61 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [orderPlaced, setOrderPlaced] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [cloudReady, setCloudReady] = useState(!backendEnabled);
+  const tgsProductIdsRef = useRef([]);
+  const tgsOrderIdsRef = useRef([]);
+  const littleJessieProductIdsRef = useRef([]);
+  const littleJessieGalleryIdsRef = useRef([]);
 
   useEffect(() => {
     const syncRoute = () => setRoutePath(window.location.pathname);
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
+  }, []);
+
+  useEffect(() => {
+    if (!backendEnabled) return;
+
+    let cancelled = false;
+    async function loadCloudData() {
+      try {
+        const [cloudTgsProducts, cloudTgsOrders, cloudLittleJessieProducts, cloudLittleJessieGallery] = await Promise.all([
+          fetchTable("tgs_products"),
+          fetchTable("tgs_orders"),
+          fetchTable("little_jessie_products"),
+          fetchTable("little_jessie_gallery"),
+        ]);
+
+        if (cancelled) return;
+
+        const nextTgsProducts = Array.isArray(cloudTgsProducts) && cloudTgsProducts.length ? cloudTgsProducts.map(fromDbTgsProduct) : defaultProducts;
+        const nextLittleJessieProducts = Array.isArray(cloudLittleJessieProducts) && cloudLittleJessieProducts.length ? cloudLittleJessieProducts.map(fromDbLittleJessieProduct) : defaultLittleJessieProducts;
+        const nextLittleJessieGallery = Array.isArray(cloudLittleJessieGallery) && cloudLittleJessieGallery.length ? cloudLittleJessieGallery.map(fromDbLittleJessieGallery) : defaultLittleJessieGallery;
+        const nextOrders = Array.isArray(cloudTgsOrders) ? cloudTgsOrders.map(fromDbTgsOrder) : [];
+
+        setProductsCatalog(nextTgsProducts);
+        setLittleJessieProducts(nextLittleJessieProducts);
+        setLittleJessieGallery(nextLittleJessieGallery);
+        setOrders(nextOrders);
+        tgsProductIdsRef.current = nextTgsProducts.map((product) => product.id);
+        tgsOrderIdsRef.current = nextOrders.map((order) => order.reference);
+        littleJessieProductIdsRef.current = nextLittleJessieProducts.map((product) => product.id);
+        littleJessieGalleryIdsRef.current = nextLittleJessieGallery.map((item) => item.id);
+
+        if (!Array.isArray(cloudTgsProducts) || cloudTgsProducts.length === 0) await upsertRecords("tgs_products", defaultProducts.map(toDbTgsProduct));
+        if (!Array.isArray(cloudLittleJessieProducts) || cloudLittleJessieProducts.length === 0) await upsertRecords("little_jessie_products", defaultLittleJessieProducts.map(toDbLittleJessieProduct));
+        if (!Array.isArray(cloudLittleJessieGallery) || cloudLittleJessieGallery.length === 0) await upsertRecords("little_jessie_gallery", defaultLittleJessieGallery.map(toDbLittleJessieGallery));
+      } catch (error) {
+        console.error(error);
+        setNotice("Cloud database is not ready yet. Using browser records for now.");
+        window.setTimeout(() => setNotice(""), 3200);
+      } finally {
+        if (!cancelled) setCloudReady(true);
+      }
+    }
+
+    loadCloudData();
+    return () => { cancelled = true; };
   }, []);
 
   const isAdminRoute = routePath === "/admin";
@@ -2997,6 +3168,26 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(orderStorageKey, JSON.stringify(orders));
   }, [orders]);
+
+  useEffect(() => {
+    if (!cloudReady || !backendEnabled) return;
+    syncBackendCollection("tgs_products", "id", productsCatalog, tgsProductIdsRef, toDbTgsProduct).catch(console.error);
+  }, [productsCatalog, cloudReady]);
+
+  useEffect(() => {
+    if (!cloudReady || !backendEnabled) return;
+    syncBackendCollection("tgs_orders", "reference", orders, tgsOrderIdsRef, toDbTgsOrder).catch(console.error);
+  }, [orders, cloudReady]);
+
+  useEffect(() => {
+    if (!cloudReady || !backendEnabled) return;
+    syncBackendCollection("little_jessie_products", "id", littleJessieProducts, littleJessieProductIdsRef, toDbLittleJessieProduct).catch(console.error);
+  }, [littleJessieProducts, cloudReady]);
+
+  useEffect(() => {
+    if (!cloudReady || !backendEnabled) return;
+    syncBackendCollection("little_jessie_gallery", "id", littleJessieGallery, littleJessieGalleryIdsRef, toDbLittleJessieGallery).catch(console.error);
+  }, [littleJessieGallery, cloudReady]);
 
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 

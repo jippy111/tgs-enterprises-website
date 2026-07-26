@@ -5,7 +5,7 @@ export const backendEnabled = Boolean(supabaseUrl && supabaseAnonKey);
 
 async function supabaseRequest(table, options = {}) {
   if (!backendEnabled) return null;
-  const { method = "GET", body, query = "select=*" } = options;
+  const { method = "GET", body, query = "select=*", headers = {} } = options;
   const separator = query ? "?" : "";
   const response = await fetch(supabaseUrl + "/rest/v1/" + table + separator + query, {
     method,
@@ -14,6 +14,7 @@ async function supabaseRequest(table, options = {}) {
       Authorization: "Bearer " + supabaseAnonKey,
       "Content-Type": "application/json",
       Prefer: method === "POST" ? "return=representation" : "return=minimal",
+      ...headers,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -32,6 +33,15 @@ export async function fetchTable(table) {
 
 export async function insertRecord(table, record) {
   return supabaseRequest(table, { method: "POST", body: record });
+}
+
+export async function upsertRecords(table, records) {
+  if (!Array.isArray(records) || records.length === 0) return null;
+  return supabaseRequest(table, {
+    method: "POST",
+    body: records,
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+  });
 }
 
 export async function updateRecord(table, primaryKey, value, record) {
