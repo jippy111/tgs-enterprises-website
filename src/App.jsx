@@ -2921,11 +2921,11 @@ function CorporateLandingPage({ onNavigate }) {
           </div>
         </div>
         <div className="border border-[#ead9a8]/70 bg-white p-6 shadow-[0_30px_80px_rgba(17,17,17,0.08)]">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">Corporate Snapshot</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">Business Snapshot</p>
           <div className="mt-6 grid gap-4">
-            <div className="border border-neutral-100 bg-[#fff9ed] p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#b78a1f]">President</p><p className="mt-2 text-xl font-bold">Company Executive Office</p></div>
-            <div className="border border-neutral-100 bg-[#fff8fb] p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-pink-500">Secretary</p><p className="mt-2 text-xl font-bold">Corporate Administration</p></div>
-            <div className="border border-neutral-100 bg-neutral-50 p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">Current Brands</p><p className="mt-2 text-xl font-bold">2 Active Business Lines</p></div>
+            <div className="border border-neutral-100 bg-[#fff9ed] p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#b78a1f]">Fashion Retail</p><p className="mt-2 text-xl font-bold">The Grace Shop Bags</p></div>
+            <div className="border border-neutral-100 bg-[#fff8fb] p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-pink-500">Creative Services</p><p className="mt-2 text-xl font-bold">Little Jessie Studyo</p></div>
+            <div className="border border-neutral-100 bg-neutral-50 p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">Customer Support</p><p className="mt-2 text-xl font-bold">Online Orders and Bookings</p></div>
           </div>
         </div>
       </section>
