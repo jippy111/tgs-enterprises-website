@@ -1523,7 +1523,13 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
 
   const removeProduct = (id) => {
     if (!window.confirm("Remove this Little Jessie product?")) return;
-    saveProducts(products.filter((product) => product.id !== id));
+    const nextProducts = products.filter((product) => product.id !== id);
+    saveProducts(nextProducts);
+    if (publishProductsOnline) {
+      publishProductsOnline(nextProducts, { removeMissing: true }).then((published) => {
+        setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+      });
+    }
     setEditingId(null);
   };
 
@@ -1531,6 +1537,11 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
     if (!window.confirm("Reset Little Jessie products to the starter menu?")) return;
     localStorage.removeItem(littleJessieProductStorageKey);
     saveProducts(defaultLittleJessieProducts);
+    if (publishProductsOnline) {
+      publishProductsOnline(defaultLittleJessieProducts, { removeMissing: true }).then((published) => {
+        setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+      });
+    }
     setEditingId(null);
   };
 
@@ -1560,7 +1571,7 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
             <button type="button" onClick={async () => {
               if (!publishProductsOnline) return;
               setProductSaveMessage("Publishing Little Jessie changes online...");
-              const published = await publishProductsOnline(products);
+              const published = await publishProductsOnline(products, { removeMissing: true });
               setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
             }} className="w-fit bg-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-pink-600">Publish Products</button>
             <button type="button" onClick={resetProducts} className="w-fit border border-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-stone-950 hover:text-white">Reset Little Jessie Products</button>
@@ -3474,7 +3485,7 @@ export default function App() {
     }
   };
 
-  const publishLittleJessieProducts = async (nextProducts = littleJessieProducts) => {
+  const publishLittleJessieProducts = async (nextProducts = littleJessieProducts, options = {}) => {
     localStorage.setItem(littleJessieProductStorageKey, JSON.stringify(nextProducts));
 
     if (!backendEnabled) {
@@ -3484,11 +3495,13 @@ export default function App() {
     }
 
     try {
-      const cloudProducts = await fetchTable("little_jessie_products");
       const nextIds = nextProducts.map((product) => product.id).filter(Boolean);
-      const cloudIds = Array.isArray(cloudProducts) ? cloudProducts.map((product) => product.id).filter(Boolean) : [];
-      const removedIds = cloudIds.filter((id) => !nextIds.includes(id));
-      await Promise.all(removedIds.map((id) => deleteRecord("little_jessie_products", "id", id)));
+      if (options.removeMissing) {
+        const cloudProducts = await fetchTable("little_jessie_products");
+        const cloudIds = Array.isArray(cloudProducts) ? cloudProducts.map((product) => product.id).filter(Boolean) : [];
+        const removedIds = cloudIds.filter((id) => !nextIds.includes(id));
+        await Promise.all(removedIds.map((id) => deleteRecord("little_jessie_products", "id", id)));
+      }
       if (nextProducts.length) await upsertRecords("little_jessie_products", nextProducts.map(toDbLittleJessieProduct));
       littleJessieProductIdsRef.current = nextIds;
       setNotice("Little Jessie product changes are now live online.");
@@ -3496,8 +3509,8 @@ export default function App() {
       return true;
     } catch (error) {
       console.error(error);
-      setNotice("Little Jessie product changes were saved on this browser, but the online database did not accept the update.");
-      window.setTimeout(() => setNotice(""), 4200);
+      setNotice("Little Jessie product changes were saved on this browser, but Supabase rejected the online update: " + error.message);
+      window.setTimeout(() => setNotice(""), 7000);
       return false;
     }
   };

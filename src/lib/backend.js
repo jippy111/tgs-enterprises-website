@@ -75,7 +75,14 @@ async function supabaseRequest(table, options = {}) {
   });
 
   if (!response.ok) {
-    throw new Error("Backend request failed: " + response.status + " " + response.statusText);
+    let details = "";
+    try {
+      const payload = await response.json();
+      details = payload.message || payload.msg || payload.details || payload.hint || "";
+    } catch {
+      details = await response.text().catch(() => "");
+    }
+    throw new Error("Backend request failed: " + response.status + " " + response.statusText + (details ? " - " + details : ""));
   }
 
   if (response.status === 204) return null;
