@@ -86,7 +86,9 @@ async function supabaseRequest(table, options = {}) {
   }
 
   if (response.status === 204) return null;
-  return response.json();
+  const text = await response.text();
+  if (!text) return null;
+  return JSON.parse(text);
 }
 
 export async function fetchTable(table) {
@@ -97,10 +99,12 @@ export async function insertRecord(table, record) {
   return supabaseRequest(table, { method: "POST", body: record });
 }
 
-export async function upsertRecords(table, records) {
+export async function upsertRecords(table, records, conflictKey = "") {
   if (!Array.isArray(records) || records.length === 0) return null;
+  const query = conflictKey ? "on_conflict=" + encodeURIComponent(conflictKey) : "";
   return supabaseRequest(table, {
     method: "POST",
+    query,
     body: records,
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
   });

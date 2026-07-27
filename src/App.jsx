@@ -333,7 +333,7 @@ async function syncBackendCollection(table, primaryKey, items, previousIdsRef, t
   const previousIds = previousIdsRef.current || [];
   const removedIds = previousIds.filter((id) => !currentIds.includes(id));
   await Promise.all(removedIds.map((id) => deleteRecord(table, primaryKey, id)));
-  if (items.length) await upsertRecords(table, items.map(toDb));
+  if (items.length) await upsertRecords(table, items.map(toDb), primaryKey);
   previousIdsRef.current = currentIds;
 }
 
@@ -3390,9 +3390,9 @@ export default function App() {
         littleJessieProductIdsRef.current = nextLittleJessieProducts.map((product) => product.id);
         littleJessieGalleryIdsRef.current = nextLittleJessieGallery.map((item) => item.id);
 
-        if (!Array.isArray(cloudTgsProducts) || cloudTgsProducts.length === 0) await upsertRecords("tgs_products", defaultProducts.map(toDbTgsProduct));
-        if (!Array.isArray(cloudLittleJessieProducts) || cloudLittleJessieProducts.length === 0) await upsertRecords("little_jessie_products", defaultLittleJessieProducts.map(toDbLittleJessieProduct));
-        if (!Array.isArray(cloudLittleJessieGallery) || cloudLittleJessieGallery.length === 0) await upsertRecords("little_jessie_gallery", defaultLittleJessieGallery.map(toDbLittleJessieGallery));
+        if (!Array.isArray(cloudTgsProducts) || cloudTgsProducts.length === 0) await upsertRecords("tgs_products", defaultProducts.map(toDbTgsProduct), "id");
+        if (!Array.isArray(cloudLittleJessieProducts) || cloudLittleJessieProducts.length === 0) await upsertRecords("little_jessie_products", defaultLittleJessieProducts.map(toDbLittleJessieProduct), "id");
+        if (!Array.isArray(cloudLittleJessieGallery) || cloudLittleJessieGallery.length === 0) await upsertRecords("little_jessie_gallery", defaultLittleJessieGallery.map(toDbLittleJessieGallery), "id");
       } catch (error) {
         console.error(error);
         setNotice("Cloud database is not ready yet. Using browser records for now.");
@@ -3472,7 +3472,7 @@ export default function App() {
       const cloudIds = Array.isArray(cloudProducts) ? cloudProducts.map((product) => product.id).filter(Boolean) : [];
       const removedIds = cloudIds.filter((id) => !nextIds.includes(id));
       await Promise.all(removedIds.map((id) => deleteRecord("tgs_products", "id", id)));
-      if (nextProducts.length) await upsertRecords("tgs_products", nextProducts.map(toDbTgsProduct));
+      if (nextProducts.length) await upsertRecords("tgs_products", nextProducts.map(toDbTgsProduct), "id");
       tgsProductIdsRef.current = nextIds;
       setNotice("Bag changes are now live online.");
       window.setTimeout(() => setNotice(""), 3200);
@@ -3502,7 +3502,7 @@ export default function App() {
         const removedIds = cloudIds.filter((id) => !nextIds.includes(id));
         await Promise.all(removedIds.map((id) => deleteRecord("little_jessie_products", "id", id)));
       }
-      if (nextProducts.length) await upsertRecords("little_jessie_products", nextProducts.map(toDbLittleJessieProduct));
+      if (nextProducts.length) await upsertRecords("little_jessie_products", nextProducts.map(toDbLittleJessieProduct), "id");
       littleJessieProductIdsRef.current = nextIds;
       setNotice("Little Jessie product changes are now live online.");
       window.setTimeout(() => setNotice(""), 3200);
@@ -3530,7 +3530,7 @@ export default function App() {
       const cloudIds = Array.isArray(cloudGallery) ? cloudGallery.map((item) => item.id).filter(Boolean) : [];
       const removedIds = cloudIds.filter((id) => !nextIds.includes(id));
       await Promise.all(removedIds.map((id) => deleteRecord("little_jessie_gallery", "id", id)));
-      if (nextGallery.length) await upsertRecords("little_jessie_gallery", nextGallery.map(toDbLittleJessieGallery));
+      if (nextGallery.length) await upsertRecords("little_jessie_gallery", nextGallery.map(toDbLittleJessieGallery), "id");
       littleJessieGalleryIdsRef.current = nextIds;
       setNotice("Little Jessie gallery changes are now live online.");
       window.setTimeout(() => setNotice(""), 3200);
