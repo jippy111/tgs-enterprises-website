@@ -293,6 +293,40 @@ function fromDbLittleJessieRental(booking) {
   };
 }
 
+function resizeImageFile(file, maxSize = 1200, quality = 0.82) {
+  return new Promise((resolve) => {
+    if (!file || !file.type?.startsWith("image/")) {
+      resolve("");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const source = String(reader.result || "");
+      const image = new Image();
+      image.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          resolve(source);
+          return;
+        }
+        context.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      image.onerror = () => resolve(source);
+      image.src = source;
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
 async function syncBackendCollection(table, primaryKey, items, previousIdsRef, toDb) {
   if (!backendEnabled) return;
   const currentIds = items.map((item) => item[primaryKey]).filter(Boolean);
@@ -1326,18 +1360,16 @@ function LittleJessieGalleryAdmin({ gallery, setGallery, publishGalleryOnline })
     saveGallery(gallery.map((item) => item.id === id ? { ...item, ...updates } : item));
   };
 
-  const uploadImage = (id, file) => {
+  const uploadImage = async (id, file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => updateItem(id, { image: reader.result });
-    reader.readAsDataURL(file);
+    const image = await resizeImageFile(file);
+    if (image) updateItem(id, { image });
   };
 
-  const uploadDraftImage = (file) => {
+  const uploadDraftImage = async (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setDraft((current) => ({ ...current, image: reader.result }));
-    reader.readAsDataURL(file);
+    const image = await resizeImageFile(file);
+    if (image) setDraft((current) => ({ ...current, image }));
   };
 
   const addGalleryItem = (event) => {
@@ -1461,18 +1493,16 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
     saveProducts(products.map((product) => product.id === id ? { ...product, ...updates } : product));
   };
 
-  const uploadImage = (id, file) => {
+  const uploadImage = async (id, file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => updateProduct(id, { image: reader.result });
-    reader.readAsDataURL(file);
+    const image = await resizeImageFile(file);
+    if (image) updateProduct(id, { image });
   };
 
-  const uploadDraftImage = (file) => {
+  const uploadDraftImage = async (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setDraft((current) => ({ ...current, image: reader.result }));
-    reader.readAsDataURL(file);
+    const image = await resizeImageFile(file);
+    if (image) setDraft((current) => ({ ...current, image }));
   };
 
   const addProduct = (event) => {
@@ -2071,18 +2101,16 @@ function AdminPanel({ productsCatalog, setProductsCatalog, publishProductsOnline
     updateProduct(id, { specs: { ...getProductSpecs(product), [key]: value } });
   };
 
-  const uploadImage = (id, file) => {
+  const uploadImage = async (id, file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => updateProduct(id, { image: reader.result });
-    reader.readAsDataURL(file);
+    const image = await resizeImageFile(file);
+    if (image) updateProduct(id, { image });
   };
 
-  const uploadDraftImage = (file) => {
+  const uploadDraftImage = async (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setDraft((current) => ({ ...current, image: reader.result }));
-    reader.readAsDataURL(file);
+    const image = await resizeImageFile(file);
+    if (image) setDraft((current) => ({ ...current, image }));
   };
 
   const addProduct = (event) => {
