@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { categories, formatCurrency, products as defaultProducts } from "./data/products";
-import { backendEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signOutBackendAdmin, updateRecord, upsertRecords } from "./lib/backend";
+import { backendEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signOutBackendAdmin, updateRecord, uploadPublicImage, upsertRecords } from "./lib/backend";
 
 const navItems = ["Home", "Shop", "Track", "About", "FAQ", "Contact"];
 const logo = "/assets/tgs-logo.jfif";
@@ -28,6 +28,7 @@ const littleJessieRentalStorageKey = "little-jessie-rental-bookings";
 const littleJessieRentalScheduleStorageKey = "little-jessie-rental-schedule";
 const littleJessieCloudErrorStorageKey = "little-jessie-cloud-publish-error";
 const littleJessieGalleryCloudErrorStorageKey = "little-jessie-gallery-cloud-publish-error";
+const imageUploadBucket = "site-images";
 const adminSessionKey = "tgs-admin-session";
 const adminLoginLockKey = "tgs-admin-login-lock";
 const adminPasswordHash = import.meta.env.VITE_ADMIN_PASSWORD_HASH || "15364102026489391938ac9eed936602c1520742890b410b4ca1a4f541fd1e9f";
@@ -300,6 +301,17 @@ function getDataUrlBytes(dataUrl) {
   return Math.ceil(base64.length * 0.75);
 }
 
+function dataUrlToBlob(dataUrl) {
+  const [metadata, base64] = String(dataUrl || "").split(",");
+  const mime = metadata?.match(/data:(.*?);/)?.[1] || "image/jpeg";
+  const binary = atob(base64 || "");
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: mime });
+}
+
 function resizeImageFile(file, maxSize = 1100, quality = 0.78, targetBytes = 420 * 1024) {
   return new Promise((resolve) => {
     if (!file || !file.type?.startsWith("image/")) {
@@ -342,6 +354,15 @@ function resizeImageFile(file, maxSize = 1100, quality = 0.78, targetBytes = 420
     reader.onerror = () => resolve("");
     reader.readAsDataURL(file);
   });
+}
+
+async function uploadImageToStorage(folder, file) {
+  const optimizedImage = await resizeImageFile(file);
+  if (!backendEnabled) return optimizedImage;
+  const blob = dataUrlToBlob(optimizedImage);
+  const safeFolder = String(folder || "uploads").replace(/[^a-z0-9/_-]/gi, "-").toLowerCase();
+  const path = safeFolder + "/" + Date.now() + "-" + Math.random().toString(36).slice(2) + ".jpg";
+  return uploadPublicImage(imageUploadBucket, path, blob);
 }
 
 async function syncBackendCollection(table, primaryKey, items, previousIdsRef, toDb) {
@@ -1380,14 +1401,29 @@ function LittleJessieGalleryAdmin({ gallery, setGallery, publishGalleryOnline })
 
   const uploadImage = async (id, file) => {
     if (!file) return;
-    const image = await resizeImageFile(file);
-    if (image) updateItem(id, { image });
+    setGallerySaveMessage("Uploading gallery image...");
+    try {
+      const image = await uploadImageToStorage("little-jessie/gallery", file);
+      if (image) updateItem(id, { image });
+    } catch (error) {
+      console.error(error);
+      localStorage.setItem(littleJessieGalleryCloudErrorStorageKey, error.message);
+      setGallerySaveMessage("Saved on this browser only. Cloud publish failed: " + error.message);
+    }
   };
 
   const uploadDraftImage = async (file) => {
     if (!file) return;
-    const image = await resizeImageFile(file);
-    if (image) setDraft((current) => ({ ...current, image }));
+    setGallerySaveMessage("Uploading gallery image...");
+    try {
+      const image = await uploadImageToStorage("little-jessie/gallery", file);
+      if (image) setDraft((current) => ({ ...current, image }));
+      setGallerySaveMessage(image && backendEnabled ? "Gallery image uploaded online." : "Gallery image ready.");
+    } catch (error) {
+      console.error(error);
+      localStorage.setItem(littleJessieGalleryCloudErrorStorageKey, error.message);
+      setGallerySaveMessage("Saved on this browser only. Cloud publish failed: " + error.message);
+    }
   };
 
   const addGalleryItem = (event) => {
@@ -1528,14 +1564,29 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
 
   const uploadImage = async (id, file) => {
     if (!file) return;
-    const image = await resizeImageFile(file);
-    if (image) updateProduct(id, { image });
+    setProductSaveMessage("Uploading product image...");
+    try {
+      const image = await uploadImageToStorage("little-jessie/products", file);
+      if (image) updateProduct(id, { image });
+    } catch (error) {
+      console.error(error);
+      localStorage.setItem(littleJessieCloudErrorStorageKey, error.message);
+      setProductSaveMessage("Saved on this browser only. Cloud publish failed: " + error.message);
+    }
   };
 
   const uploadDraftImage = async (file) => {
     if (!file) return;
-    const image = await resizeImageFile(file);
-    if (image) setDraft((current) => ({ ...current, image }));
+    setProductSaveMessage("Uploading product image...");
+    try {
+      const image = await uploadImageToStorage("little-jessie/products", file);
+      if (image) setDraft((current) => ({ ...current, image }));
+      setProductSaveMessage(image && backendEnabled ? "Product image uploaded online." : "Product image ready.");
+    } catch (error) {
+      console.error(error);
+      localStorage.setItem(littleJessieCloudErrorStorageKey, error.message);
+      setProductSaveMessage("Saved on this browser only. Cloud publish failed: " + error.message);
+    }
   };
 
   const addProduct = (event) => {
@@ -2150,14 +2201,27 @@ function AdminPanel({ productsCatalog, setProductsCatalog, publishProductsOnline
 
   const uploadImage = async (id, file) => {
     if (!file) return;
-    const image = await resizeImageFile(file);
-    if (image) updateProduct(id, { image });
+    setProductSaveMessage("Uploading bag image...");
+    try {
+      const image = await uploadImageToStorage("tgs/products", file);
+      if (image) updateProduct(id, { image });
+    } catch (error) {
+      console.error(error);
+      setProductSaveMessage("Saved on this browser only. Cloud image upload failed: " + error.message);
+    }
   };
 
   const uploadDraftImage = async (file) => {
     if (!file) return;
-    const image = await resizeImageFile(file);
-    if (image) setDraft((current) => ({ ...current, image }));
+    setProductSaveMessage("Uploading bag image...");
+    try {
+      const image = await uploadImageToStorage("tgs/products", file);
+      if (image) setDraft((current) => ({ ...current, image }));
+      setProductSaveMessage(image && backendEnabled ? "Bag image uploaded online." : "Bag image ready.");
+    } catch (error) {
+      console.error(error);
+      setProductSaveMessage("Saved on this browser only. Cloud image upload failed: " + error.message);
+    }
   };
 
   const addProduct = (event) => {

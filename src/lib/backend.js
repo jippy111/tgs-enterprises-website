@@ -124,3 +124,30 @@ export async function deleteRecord(table, primaryKey, value) {
     query: primaryKey + "=eq." + encodeURIComponent(value),
   });
 }
+
+export async function uploadPublicImage(bucket, path, file) {
+  if (!backendEnabled) throw new Error("Supabase is not configured.");
+  const response = await fetch(supabaseUrl + "/storage/v1/object/" + bucket + "/" + path, {
+    method: "POST",
+    headers: {
+      apikey: supabaseAnonKey,
+      Authorization: "Bearer " + getAuthToken(),
+      "Content-Type": file.type || "image/jpeg",
+      "x-upsert": "true",
+    },
+    body: file,
+  });
+
+  if (!response.ok) {
+    let details = "";
+    try {
+      const payload = await response.json();
+      details = payload.message || payload.error || "";
+    } catch {
+      details = await response.text().catch(() => "");
+    }
+    throw new Error("Storage upload failed: " + response.status + " " + response.statusText + (details ? " - " + details : ""));
+  }
+
+  return supabaseUrl + "/storage/v1/object/public/" + bucket + "/" + path;
+}
