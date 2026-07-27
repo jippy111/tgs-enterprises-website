@@ -117,7 +117,7 @@ function toDbTgsProduct(product) {
     description: product.description || "",
     details: Array.isArray(product.details) ? product.details : [],
     specs: product.specs || {},
-    image: product.image || "",
+    image: String(product.image || "").startsWith("data:") ? "" : product.image || "",
     featured: Boolean(product.featured),
     available: product.available !== false,
     updated_at: new Date().toISOString(),
@@ -180,7 +180,7 @@ function toDbLittleJessieProduct(product) {
     price: Number(product.price || 0),
     discount: Number(product.discount || 0),
     status: product.status || "Made to Order",
-    image: product.image || "",
+    image: String(product.image || "").startsWith("data:") ? "" : product.image || "",
     available: product.available !== false,
     updated_at: new Date().toISOString(),
   };
@@ -200,7 +200,7 @@ function toDbLittleJessieGallery(item) {
     id: item.id,
     title: item.title,
     detail: item.detail || "",
-    image: item.image || "",
+    image: String(item.image || "").startsWith("data:") ? "" : item.image || "",
     updated_at: new Date().toISOString(),
   };
 }
@@ -1700,6 +1700,7 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
             <option value="true">Visible / Available</option>
             <option value="false">Hidden / Unavailable</option>
           </select>
+          <input value={draft.image} onChange={(event) => setDraft({ ...draft, image: event.target.value })} placeholder="Cloudinary image URL" className="min-w-0 border border-stone-200 px-4 py-3 outline-none focus:border-pink-300 lg:col-span-2" />
           <input type="file" accept="image/*" onChange={(event) => uploadDraftImage(event.target.files?.[0])} className="min-w-0 border border-stone-200 bg-white px-4 py-3 text-sm" />
           <textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Product description" className="min-h-24 min-w-0 border border-stone-200 px-4 py-3 outline-none focus:border-pink-300 lg:col-span-2" />
           <button type="submit" className="bg-stone-950 px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-pink-600">Add Product</button>
@@ -1733,6 +1734,7 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
                       <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Discount<select value={product.discount || 0} onChange={(event) => updateProduct(product.id, { discount: Number(event.target.value) })} className="border border-stone-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-pink-300">{discountOptions.map((discount) => <option key={discount} value={discount}>{discount}%</option>)}</select></label>
                       <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Status<select value={product.status || "Made to Order"} onChange={(event) => updateProduct(product.id, { status: event.target.value })} className="border border-stone-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-pink-300"><option>Made to Order</option><option>Ready to Ship</option></select></label>
                       <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Availability<select value={String(product.available !== false)} onChange={(event) => updateProduct(product.id, { available: event.target.value === "true" })} className="border border-stone-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-pink-300"><option value="true">Visible / Available</option><option value="false">Hidden / Unavailable</option></select></label>
+                      <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-stone-500 md:col-span-2">Cloudinary Image URL<input value={String(product.image || "").startsWith("data:") ? "" : product.image || ""} onChange={(event) => updateProduct(product.id, { image: event.target.value })} placeholder="Paste secure_url from Cloudinary" className="border border-stone-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-pink-300" /></label>
                       <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-stone-500 md:col-span-2">Product Photo<input type="file" accept="image/*" onChange={(event) => uploadImage(product.id, event.target.files?.[0])} className="border border-stone-200 px-3 py-2 text-sm font-normal normal-case tracking-normal" /></label>
                     </div>
                     <label className="mt-4 grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Product Description<textarea value={product.description || ""} onChange={(event) => updateProduct(product.id, { description: event.target.value })} className="min-h-24 border border-stone-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-pink-300" /></label>
@@ -2333,6 +2335,7 @@ function AdminPanel({ productsCatalog, setProductsCatalog, publishProductsOnline
           <input value={draft.closure} onChange={(event) => setDraft({ ...draft, closure: event.target.value })} placeholder="Closure" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]" />
           <input value={draft.care} onChange={(event) => setDraft({ ...draft, care: event.target.value })} placeholder="Care instructions" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]" />
           <select value={draft.available} onChange={(event) => setDraft({ ...draft, available: event.target.value })} className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]"><option value="true">Available</option><option value="false">Unavailable</option></select>
+          <input value={draft.image} onChange={(event) => setDraft({ ...draft, image: event.target.value })} placeholder="Cloudinary image URL" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f] lg:col-span-2" />
           <input type="file" accept="image/*" onChange={(event) => uploadDraftImage(event.target.files?.[0])} className="min-w-0 border border-neutral-200 bg-white px-4 py-3 text-sm" />
           <button type="submit" className="bg-neutral-950 px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#9f7418]">Add Bag</button>
           <textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Short product description" className="min-h-24 min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f] lg:col-span-2" />
@@ -2415,6 +2418,11 @@ function AdminPanel({ productsCatalog, setProductsCatalog, publishProductsOnline
                         ))}
                       </div>
                     </div>
+
+                    <label className="mt-4 grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+                      Cloudinary Image URL
+                      <input value={String(product.image || "").startsWith("data:") ? "" : product.image || ""} onChange={(event) => updateProductField(product.id, "image", event.target.value)} placeholder="Paste secure_url from Cloudinary" className="border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-neutral-950 outline-none focus:border-[#b78a1f]" />
+                    </label>
 
                     <label className="mt-4 grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
                       Product Photo
