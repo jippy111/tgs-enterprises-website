@@ -295,7 +295,12 @@ function fromDbLittleJessieRental(booking) {
   };
 }
 
-function resizeImageFile(file, maxSize = 1800, quality = 0.9) {
+function getDataUrlBytes(dataUrl) {
+  const base64 = String(dataUrl || "").split(",")[1] || "";
+  return Math.ceil(base64.length * 0.75);
+}
+
+function resizeImageFile(file, maxSize = 1100, quality = 0.78, targetBytes = 420 * 1024) {
   return new Promise((resolve) => {
     if (!file || !file.type?.startsWith("image/")) {
       resolve("");
@@ -307,19 +312,29 @@ function resizeImageFile(file, maxSize = 1800, quality = 0.9) {
       const source = String(reader.result || "");
       const image = new Image();
       image.onload = () => {
-        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-        const width = Math.max(1, Math.round(image.width * scale));
-        const height = Math.max(1, Math.round(image.height * scale));
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext("2d");
-        if (!context) {
-          resolve(source);
-          return;
+        let currentMaxSize = maxSize;
+        let currentQuality = quality;
+        let result = source;
+
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          const scale = Math.min(1, currentMaxSize / Math.max(image.width, image.height));
+          const width = Math.max(1, Math.round(image.width * scale));
+          const height = Math.max(1, Math.round(image.height * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext("2d");
+          if (!context) break;
+          context.fillStyle = "#ffffff";
+          context.fillRect(0, 0, width, height);
+          context.drawImage(image, 0, 0, width, height);
+          result = canvas.toDataURL("image/jpeg", currentQuality);
+          if (getDataUrlBytes(result) <= targetBytes) break;
+          currentMaxSize = Math.max(640, Math.round(currentMaxSize * 0.82));
+          currentQuality = Math.max(0.62, currentQuality - 0.06);
         }
-        context.drawImage(image, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
+
+        resolve(result);
       };
       image.onerror = () => resolve(source);
       image.src = source;
