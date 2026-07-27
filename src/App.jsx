@@ -293,7 +293,7 @@ function fromDbLittleJessieRental(booking) {
   };
 }
 
-function resizeImageFile(file, maxSize = 1200, quality = 0.82) {
+function resizeImageFile(file, maxSize = 1800, quality = 0.9) {
   return new Promise((resolve) => {
     if (!file || !file.type?.startsWith("image/")) {
       resolve("");
@@ -1431,7 +1431,7 @@ function LittleJessieGalleryAdmin({ gallery, setGallery, publishGalleryOnline })
             return (
               <article key={item.id} className="border border-pink-100 bg-[#fff8fb] p-4 shadow-sm">
                 <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-white text-center text-sm font-semibold text-pink-500">
-                  {item.image ? <img src={item.image} alt={item.title} className="h-full w-full object-cover" /> : "No image yet"}
+                  {item.image ? <img src={item.image} alt={item.title} className="h-full w-full object-contain bg-white p-2" /> : "No image yet"}
                 </div>
                 <div className="mt-4 flex items-start justify-between gap-3">
                   <div>
@@ -1604,7 +1604,7 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
             return (
               <article key={product.id} className="border border-pink-100 bg-white p-4 shadow-sm">
                 <div className="grid gap-4 sm:grid-cols-[92px_1fr_auto] sm:items-center">
-                  <div className="flex h-24 items-center justify-center overflow-hidden bg-[#fff1f6] text-xs font-semibold text-pink-500">{product.image ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" /> : "No image"}</div>
+                  <div className="flex h-28 items-center justify-center overflow-hidden bg-[#fff1f6] text-xs font-semibold text-pink-500">{product.image ? <img src={product.image} alt={product.name} className="h-full w-full object-contain bg-white p-2" /> : "No image"}</div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="border border-pink-100 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-pink-600">{getAvailabilityText(product)}</span>
@@ -2784,7 +2784,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
               return (
                 <article key={product.id} className="border border-pink-100 bg-[#fff8fb] p-5 shadow-sm">
                   <div className="flex h-36 items-center justify-center overflow-hidden bg-white text-center text-sm font-semibold text-pink-500">
-                    {product.image ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" /> : <div className="grid h-full w-full place-items-center bg-gradient-to-br from-pink-50 via-white to-pink-100 p-6 text-center"><div><p className="text-xs font-bold uppercase tracking-[0.22em] text-pink-500">Little Jessie Studyo</p><p className="mt-3 text-lg font-bold text-stone-900">Custom Made</p><p className="mt-2 text-sm text-stone-500">Photo can be added in admin</p></div></div>}
+                    {product.image ? <img src={product.image} alt={product.name} className="h-full w-full object-contain p-2" /> : <div className="grid h-full w-full place-items-center bg-gradient-to-br from-pink-50 via-white to-pink-100 p-6 text-center"><div><p className="text-xs font-bold uppercase tracking-[0.22em] text-pink-500">Little Jessie Studyo</p><p className="mt-3 text-lg font-bold text-stone-900">Custom Made</p><p className="mt-2 text-sm text-stone-500">Photo can be added in admin</p></div></div>}
                   </div>
                   <div className="mt-4 flex flex-wrap items-center gap-2">
                     <span className="border border-pink-200 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-pink-600">{getAvailabilityText(product)}</span>
@@ -2822,7 +2822,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
             {gallery.map((item, index) => (
               <article key={item.title} className={"border border-pink-100 bg-white p-4 shadow-sm " + (index === 0 ? "sm:col-span-2" : "")}>
                 <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-[#fff1f6] text-center text-sm font-semibold text-pink-500">
-                  {item.image ? <img src={item.image} alt={item.title} className="h-full w-full object-cover" /> : <div className="grid h-full w-full place-items-center bg-gradient-to-br from-pink-50 via-white to-pink-100 p-6 text-center"><div><p className="text-xs font-bold uppercase tracking-[0.22em] text-pink-500">Past Work</p><p className="mt-3 text-lg font-bold text-stone-900">Little Jessie Studyo</p><p className="mt-2 text-sm text-stone-500">Gallery image ready for upload</p></div></div>}
+                  {item.image ? <img src={item.image} alt={item.title} className="h-full w-full object-contain bg-white p-2" /> : <div className="grid h-full w-full place-items-center bg-gradient-to-br from-pink-50 via-white to-pink-100 p-6 text-center"><div><p className="text-xs font-bold uppercase tracking-[0.22em] text-pink-500">Past Work</p><p className="mt-3 text-lg font-bold text-stone-900">Little Jessie Studyo</p><p className="mt-2 text-sm text-stone-500">Gallery image ready for upload</p></div></div>}
                 </div>
                 <h3 className="mt-4 font-semibold">{item.title}</h3>
                 <p className="mt-2 text-sm leading-6 text-stone-600">{item.detail}</p>
@@ -3509,7 +3509,7 @@ export default function App() {
       return true;
     } catch (error) {
       console.error(error);
-      setNotice("Little Jessie product changes were saved on this browser, but Supabase rejected the online update: " + error.message);
+      setNotice("Little Jessie product changes were saved on this browser, but Supabase rejected the online update: " + error.message + ". Check Supabase policies and Vercel environment variables.");
       window.setTimeout(() => setNotice(""), 7000);
       return false;
     }
