@@ -302,6 +302,27 @@ function fromDbLittleJessieRental(booking) {
   };
 }
 
+function toDbLittleJessieRentalSchedule(schedule) {
+  return {
+    id: schedule.id || schedule.date,
+    date: schedule.date,
+    blocked: Boolean(schedule.blocked),
+    next_available_time: schedule.nextAvailableTime || "",
+    note: schedule.note || "",
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function fromDbLittleJessieRentalSchedule(schedule) {
+  return {
+    id: schedule.id || schedule.date,
+    date: schedule.date || schedule.id || "",
+    blocked: Boolean(schedule.blocked),
+    nextAvailableTime: schedule.next_available_time || schedule.nextAvailableTime || "",
+    note: schedule.note || "",
+  };
+}
+
 function getDataUrlBytes(dataUrl) {
   const base64 = String(dataUrl || "").split(",")[1] || "";
   return Math.ceil(base64.length * 0.75);
@@ -1301,6 +1322,31 @@ function LittleJessieRentalScheduleAdminPanel() {
   const [schedules, setSchedules] = useState(() => {
     try { return JSON.parse(localStorage.getItem(littleJessieRentalScheduleStorageKey)) || []; } catch { return []; }
   });
+  const [scheduleMessage, setScheduleMessage] = useState("");
+
+  const refreshSchedules = useCallback(() => {
+    if (!backendEnabled) return Promise.resolve();
+    setScheduleMessage("Checking online calendar...");
+    return fetchTable("little_jessie_rental_schedule")
+      .then((cloudSchedules) => {
+        const nextSchedules = Array.isArray(cloudSchedules)
+          ? cloudSchedules.map(fromDbLittleJessieRentalSchedule).filter((schedule) => schedule.date).sort((a, b) => a.date.localeCompare(b.date))
+          : [];
+        setSchedules(nextSchedules);
+        localStorage.setItem(littleJessieRentalScheduleStorageKey, JSON.stringify(nextSchedules));
+        setScheduleMessage(nextSchedules.length ? "Rental calendar is updated online." : "No online schedule controls yet.");
+        window.setTimeout(() => setScheduleMessage(""), 2600);
+      })
+      .catch((error) => {
+        console.error(error);
+        setScheduleMessage("Calendar sync failed: " + error.message);
+        window.setTimeout(() => setScheduleMessage(""), 5200);
+      });
+  }, []);
+
+  useEffect(() => {
+    refreshSchedules();
+  }, [refreshSchedules]);
 
   const saveSchedules = (nextSchedules) => {
     setSchedules(nextSchedules);
@@ -1311,16 +1357,47 @@ function LittleJessieRentalScheduleAdminPanel() {
     event.preventDefault();
     if (!draft.date) return;
     const item = { ...draft, id: draft.date };
-    saveSchedules([item, ...schedules.filter((schedule) => schedule.date !== draft.date)]);
+    const nextSchedules = [item, ...schedules.filter((schedule) => schedule.date !== draft.date)].sort((a, b) => a.date.localeCompare(b.date));
+    saveSchedules(nextSchedules);
+    if (backendEnabled) {
+      upsertRecords("little_jessie_rental_schedule", [toDbLittleJessieRentalSchedule(item)], "id")
+        .then(() => {
+          setScheduleMessage("Schedule saved online.");
+          window.setTimeout(() => setScheduleMessage(""), 2600);
+        })
+        .catch((error) => {
+          console.error(error);
+          setScheduleMessage("Saved on this browser only. Online calendar save failed: " + error.message);
+          window.setTimeout(() => setScheduleMessage(""), 5200);
+        });
+    }
     setDraft(emptyDraft);
   };
 
   const updateSchedule = (date, updates) => {
-    saveSchedules(schedules.map((schedule) => schedule.date === date ? { ...schedule, ...updates } : schedule));
+    const nextSchedules = schedules.map((schedule) => schedule.date === date ? { ...schedule, ...updates, id: updates.date || schedule.date } : schedule).sort((a, b) => a.date.localeCompare(b.date));
+    saveSchedules(nextSchedules);
+    const updatedSchedule = nextSchedules.find((schedule) => schedule.date === (updates.date || date));
+    if (backendEnabled && updatedSchedule) {
+      upsertRecords("little_jessie_rental_schedule", [toDbLittleJessieRentalSchedule(updatedSchedule)], "id").catch(console.error);
+      if (updates.date && updates.date !== date) deleteRecord("little_jessie_rental_schedule", "id", date).catch(console.error);
+    }
   };
 
   const removeSchedule = (date) => {
     saveSchedules(schedules.filter((schedule) => schedule.date !== date));
+    if (backendEnabled) {
+      deleteRecord("little_jessie_rental_schedule", "id", date)
+        .then(() => {
+          setScheduleMessage("Schedule removed online.");
+          window.setTimeout(() => setScheduleMessage(""), 2600);
+        })
+        .catch((error) => {
+          console.error(error);
+          setScheduleMessage("Removed on this browser only. Online delete failed: " + error.message);
+          window.setTimeout(() => setScheduleMessage(""), 5200);
+        });
+    }
   };
 
   return (
@@ -1338,6 +1415,7 @@ function LittleJessieRentalScheduleAdminPanel() {
           <input value={draft.note} onChange={(event) => setDraft({ ...draft, note: event.target.value })} placeholder="Admin note shown to client" className="border border-stone-200 px-4 py-3 outline-none focus:border-pink-300" />
           <button type="submit" className="bg-stone-950 px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-pink-600">Save Schedule</button>
         </form>
+        {scheduleMessage && <p className="mb-4 border border-pink-100 bg-[#fff8fb] px-4 py-3 text-sm font-semibold text-pink-700">{scheduleMessage}</p>}
         <div className="grid gap-3">
           {schedules.length === 0 ? <div className="border border-pink-100 bg-[#fff8fb] p-5 text-sm text-stone-600">No schedule controls yet.</div> : schedules.map((schedule) => (
             <article key={schedule.date} className="grid gap-3 border border-pink-100 bg-[#fff8fb] p-4 md:grid-cols-[160px_160px_160px_1fr_auto] md:items-center">
@@ -2670,12 +2748,40 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
   const [fullPaymentConfirmationOpen, setFullPaymentConfirmationOpen] = useState(false);
   const [fullPaymentToastOpen, setFullPaymentToastOpen] = useState(false);
   const [rentalTrackCode, setRentalTrackCode] = useState("");
+  const [rentalSchedules, setRentalSchedules] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(littleJessieRentalScheduleStorageKey) || "[]"); } catch { return []; }
+  });
+  const [rentalCalendarMonth, setRentalCalendarMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
 
   useEffect(() => {
     if (!products.some((product) => product.name === inquiry.productType)) {
       setInquiry((current) => ({ ...current, productType: products[0]?.name || "School Label Set" }));
     }
   }, [products, inquiry.productType]);
+
+  useEffect(() => {
+    if (!backendEnabled) return;
+    let cancelled = false;
+    const loadRentalSchedules = () => {
+      fetchTable("little_jessie_rental_schedule")
+        .then((cloudSchedules) => {
+          if (cancelled || !Array.isArray(cloudSchedules)) return;
+          const nextSchedules = cloudSchedules.map(fromDbLittleJessieRentalSchedule).filter((schedule) => schedule.date);
+          setRentalSchedules(nextSchedules);
+          localStorage.setItem(littleJessieRentalScheduleStorageKey, JSON.stringify(nextSchedules));
+        })
+        .catch(console.error);
+    };
+    loadRentalSchedules();
+    const interval = window.setInterval(loadRentalSchedules, 20000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   const updateInquiry = (field, value) => {
     setInquiry((current) => ({ ...current, [field]: value }));
@@ -2749,11 +2855,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
   };
 
   const getRentalScheduleSettings = () => {
-    try {
-      return JSON.parse(localStorage.getItem(littleJessieRentalScheduleStorageKey) || "[]");
-    } catch {
-      return [];
-    }
+    return rentalSchedules;
   };
 
   const normalizeReservationCode = (value) => String(value || "").replace(/[^a-z0-9]/gi, "").toLowerCase();
@@ -2873,6 +2975,54 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
     if (schedule.blocked) return "Fully booked for this date. " + (schedule.note || "Please choose another date.");
     if (schedule.nextAvailableTime) return "Admin note: Next available time is " + schedule.nextAvailableTime + ". " + (schedule.note || "");
     return schedule.note || "Date is available.";
+  };
+
+  const formatRentalDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return year + "-" + month + "-" + day;
+  };
+
+  const rentalCalendarWeekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const rentalCalendarMonthLabel = rentalCalendarMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const selectedRentalSchedule = getRentalScheduleForDate(rentalBooking.eventDate);
+  const selectedRentalDateLabel = rentalBooking.eventDate
+    ? new Date(rentalBooking.eventDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+    : "No date selected";
+
+  const rentalCalendarDays = useMemo(() => {
+    const year = rentalCalendarMonth.getFullYear();
+    const month = rentalCalendarMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days = [];
+
+    for (let index = 0; index < firstDay.getDay(); index += 1) days.push(null);
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(year, month, day);
+      const dateKey = formatRentalDateKey(date);
+      days.push({
+        day,
+        dateKey,
+        schedule: getRentalScheduleForDate(dateKey),
+      });
+    }
+    while (days.length % 7 !== 0) days.push(null);
+    return days;
+  }, [rentalCalendarMonth, rentalSchedules]);
+
+  const changeRentalCalendarMonth = (amount) => {
+    setRentalCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1));
+  };
+
+  const selectRentalCalendarDate = (dateKey) => {
+    updateRentalBooking("eventDate", dateKey);
+    const schedule = getRentalScheduleForDate(dateKey);
+    if (schedule?.blocked) {
+      setRentalSaved(false);
+      setRentalMessage("This date is fully booked. Please choose another available date.");
+    }
   };
 
   const validateRentalBookingTime = () => {
@@ -3220,6 +3370,62 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
               </div>
             </div>
 
+            <div className="grid gap-5">
+              <div className="border border-pink-100 bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-pink-500">Booking Calendar</p>
+                    <h3 className="mt-2 text-2xl font-semibold tracking-tight">{rentalCalendarMonthLabel}</h3>
+                    <p className="mt-2 text-sm leading-6 text-stone-600">Tap a date to select your event schedule. Admin notes and blocked dates appear directly on the calendar.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:w-56">
+                    <button type="button" onClick={() => changeRentalCalendarMonth(-1)} className="border border-pink-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-stone-700 transition hover:border-pink-300 hover:text-pink-600">Previous</button>
+                    <button type="button" onClick={() => changeRentalCalendarMonth(1)} className="border border-pink-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-stone-700 transition hover:border-pink-300 hover:text-pink-600">Next</button>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid grid-cols-7 border-l border-t border-pink-100 bg-[#fff8fb] text-center">
+                  {rentalCalendarWeekdays.map((day) => (
+                    <div key={day} className="border-b border-r border-pink-100 px-1 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-pink-500 sm:text-xs">{day}</div>
+                  ))}
+                  {rentalCalendarDays.map((item, index) => {
+                    if (!item) return <div key={"empty-" + index} className="min-h-16 border-b border-r border-pink-100 bg-pink-50/40 sm:min-h-20" />;
+                    const isSelected = rentalBooking.eventDate === item.dateKey;
+                    const isBlocked = Boolean(item.schedule?.blocked);
+                    const hasScheduleNote = Boolean(item.schedule?.nextAvailableTime || item.schedule?.note);
+                    const statusLabel = isBlocked ? "Full" : item.schedule?.nextAvailableTime ? item.schedule.nextAvailableTime : hasScheduleNote ? "Note" : "Open";
+                    const dateClass = isSelected
+                      ? "border-pink-500 bg-pink-600 text-white"
+                      : isBlocked
+                        ? "border-pink-100 bg-stone-100 text-stone-500"
+                        : hasScheduleNote
+                          ? "border-pink-100 bg-[#fff1f6] text-pink-700 hover:bg-pink-100"
+                          : "border-pink-100 bg-white text-stone-800 hover:bg-[#fff8fb]";
+                    return (
+                      <button key={item.dateKey} type="button" onClick={() => selectRentalCalendarDate(item.dateKey)} className={"min-h-16 border-b border-r p-2 text-left transition sm:min-h-20 " + dateClass}>
+                        <span className="block text-sm font-bold">{item.day}</span>
+                        <span className={"mt-3 inline-flex max-w-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] " + (isSelected ? "bg-white/20 text-white" : isBlocked ? "bg-white text-stone-500" : "bg-pink-50 text-pink-600")}>{statusLabel}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <div className="border border-pink-100 bg-[#fff8fb] p-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-pink-500">Selected Date</p>
+                    <p className="mt-1 text-sm font-semibold text-stone-950">{selectedRentalDateLabel}</p>
+                  </div>
+                  <div className="border border-pink-100 bg-[#fff8fb] p-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-pink-500">Availability</p>
+                    <p className="mt-1 text-sm font-semibold text-stone-950">{selectedRentalSchedule?.blocked ? "Fully booked" : selectedRentalSchedule?.nextAvailableTime ? "Next available at " + selectedRentalSchedule.nextAvailableTime : "Open for request"}</p>
+                  </div>
+                  <div className="border border-pink-100 bg-[#fff8fb] p-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-pink-500">Admin Note</p>
+                    <p className="mt-1 text-sm font-semibold text-stone-950">{selectedRentalSchedule?.note || "No special note for this date."}</p>
+                  </div>
+                </div>
+              </div>
+
             <form onSubmit={saveRentalBooking} className="border border-pink-100 bg-[#fff8fb] p-5 shadow-sm">
               <div className="mb-5 flex flex-col justify-between gap-3 border border-pink-100 bg-white p-4 sm:flex-row sm:items-center">
                 <div>
@@ -3277,6 +3483,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
                 <button type="button" onClick={openFullPaymentModal} className="w-full border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 hover:border-pink-300">Settle Full Payment</button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       </section>
