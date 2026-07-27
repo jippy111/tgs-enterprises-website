@@ -2533,7 +2533,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
       <header className="border-b border-pink-100 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <a href="/" className="text-sm font-semibold text-stone-600 hover:text-stone-950">Our Brands</a>
-          <img src="/assets/little-jessie-logo-2026.jfif" alt="Little Jessie Studyo" className="h-12 w-auto object-contain" />
+          <img src="/assets/little-jessie-logo-2026.jfif" alt="Little Jessie Studyo" className="h-12 w-12 rounded-full border border-pink-100 object-cover shadow-sm" />
         </div>
       </header>
 
@@ -2549,7 +2549,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
           </div>
         </div>
         <div className="border border-pink-100 bg-white p-8 shadow-sm">
-          <img src="/assets/little-jessie-logo-2026.jfif" alt="Little Jessie Studyo logo" className="mx-auto max-h-72 w-full object-contain" />
+          <img src="/assets/little-jessie-logo-2026.jfif" alt="Little Jessie Studyo logo" className="mx-auto h-72 w-72 max-w-full rounded-full border border-pink-100 object-cover shadow-[0_24px_70px_rgba(236,72,153,0.16)]" />
         </div>
       </section>
 
