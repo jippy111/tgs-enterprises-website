@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { categories, formatCurrency, products as defaultProducts } from "./data/products";
 import { backendEnabled, cloudinaryConfig, cloudinaryEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signOutBackendAdmin, updateRecord, uploadCloudinaryImage, uploadCloudinaryImageViaServer, uploadPublicImage, upsertRecords } from "./lib/backend";
 
@@ -1363,18 +1363,37 @@ function LittleJessieRentalAdminPanel() {
       return normalizedBookings;
     } catch { return []; }
   });
+  const [rentalRefreshMessage, setRentalRefreshMessage] = useState("");
 
-  useEffect(() => {
-    if (!backendEnabled) return;
-    fetchTable("little_jessie_rentals")
+  const refreshRentalBookings = useCallback(() => {
+    if (!backendEnabled) {
+      setRentalRefreshMessage("Online database is not configured.");
+      window.setTimeout(() => setRentalRefreshMessage(""), 2600);
+      return Promise.resolve();
+    }
+    setRentalRefreshMessage("Checking online rental bookings...");
+    return fetchTable("little_jessie_rentals")
       .then((cloudBookings) => {
         if (!Array.isArray(cloudBookings)) return;
         const nextBookings = cloudBookings.map(fromDbLittleJessieRental).sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
         setBookings(nextBookings);
         localStorage.setItem(littleJessieRentalStorageKey, JSON.stringify(nextBookings));
+        setRentalRefreshMessage(nextBookings.length ? "Rental bookings are updated from online records." : "No online rental bookings yet.");
+        window.setTimeout(() => setRentalRefreshMessage(""), 2600);
       })
-      .catch(console.error);
+      .catch((error) => {
+        console.error(error);
+        setRentalRefreshMessage("Could not load online rental bookings: " + error.message);
+        window.setTimeout(() => setRentalRefreshMessage(""), 5200);
+      });
   }, []);
+
+  useEffect(() => {
+    if (!backendEnabled) return;
+    refreshRentalBookings();
+    const interval = window.setInterval(refreshRentalBookings, 12000);
+    return () => window.clearInterval(interval);
+  }, [refreshRentalBookings]);
 
   const updateBooking = (id, updates) => {
     const normalizedUpdates = { ...updates };
@@ -1398,8 +1417,12 @@ function LittleJessieRentalAdminPanel() {
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div><p className="text-xs font-bold uppercase tracking-[0.24em] text-pink-500">Little Jessie Rentals</p><h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Rental Booking Calendar</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">Review photobooth and D.I.Y Souvenir On The Spot booking requests. Reservation is confirmed only after downpayment.</p></div>
-          {bookings.length > 0 && <button type="button" onClick={clearBookings} className="w-fit border border-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-stone-950 hover:text-white">Clear Rental Bookings</button>}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button type="button" onClick={refreshRentalBookings} className="w-fit bg-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-pink-600">Refresh Bookings</button>
+            {bookings.length > 0 && <button type="button" onClick={clearBookings} className="w-fit border border-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-stone-950 hover:text-white">Clear Rental Bookings</button>}
+          </div>
         </div>
+        {rentalRefreshMessage && <p className="mb-4 border border-pink-100 bg-white px-4 py-3 text-sm font-semibold text-pink-700">{rentalRefreshMessage}</p>}
         {bookings.length === 0 ? <div className="border border-pink-100 bg-white p-6 text-center text-sm text-stone-600">No rental bookings yet.</div> : (
           <div className="grid gap-4">{bookings.map((booking) => {
             const firstPaymentType = booking.initialPaymentType || booking.paymentOption || "50% down payment";
@@ -3936,6 +3959,7 @@ export default function App() {
     localStorage.setItem(productStorageKey, JSON.stringify(nextProducts));
     setOrders((current) => [order, ...current]);
     if (backendEnabled) insertRecord("tgs_orders", toDbTgsOrder(order)).catch(console.error);
+    if (backendEnabled) upsertRecords("tgs_products", nextProducts.map(toDbTgsProduct), "id").catch(console.error);
     setOrderPlaced({ fullName: form.fullName, payment: form.payment, reference, createdAt: order.createdAt });
     setCartItems([]);
     localStorage.removeItem(cartStorageKey);
