@@ -106,6 +106,10 @@ function readSavedProducts() {
   }
 }
 
+function getCloudSafeImage(value) {
+  return String(value || "").startsWith("data:") ? "" : value || "";
+}
+
 function toDbTgsProduct(product) {
   return {
     id: product.id,
@@ -119,7 +123,7 @@ function toDbTgsProduct(product) {
     description: product.description || "",
     details: Array.isArray(product.details) ? product.details : [],
     specs: product.specs || {},
-    image: String(product.image || "").startsWith("data:") ? "" : product.image || "",
+    image: getCloudSafeImage(product.image),
     featured: Boolean(product.featured),
     available: product.available !== false,
     updated_at: new Date().toISOString(),
@@ -182,7 +186,7 @@ function toDbLittleJessieProduct(product) {
     price: Number(product.price || 0),
     discount: Number(product.discount || 0),
     status: product.status || "Made to Order",
-    image: String(product.image || "").startsWith("data:") ? "" : product.image || "",
+    image: getCloudSafeImage(product.image),
     available: product.available !== false,
     updated_at: new Date().toISOString(),
   };
@@ -202,7 +206,7 @@ function toDbLittleJessieGallery(item) {
     id: item.id,
     title: item.title,
     detail: item.detail || "",
-    image: String(item.image || "").startsWith("data:") ? "" : item.image || "",
+    image: getCloudSafeImage(item.image),
     updated_at: new Date().toISOString(),
   };
 }
@@ -229,7 +233,7 @@ function toDbLittleJessieRental(booking) {
       rentalType: booking.rentalType || "",
       rentalPackage: booking.rentalPackage || "",
       celebrantName: booking.celebrantName || "",
-      referencePhoto: booking.referencePhoto || "",
+      referencePhoto: getCloudSafeImage(booking.referencePhoto),
       eventDate: booking.eventDate || "",
       eventTime: booking.eventTime || "",
       eventType: booking.eventType || "",
@@ -246,9 +250,9 @@ function toDbLittleJessieRental(booking) {
     initial_payment_type: booking.initialPaymentType || booking.paymentOption || "50% down payment",
     initial_payment_due: Number(booking.initialPaymentDue || 0),
     payment_method: booking.paymentMethod || "",
-    payment_receipt: booking.paymentReceipt || "",
+    payment_receipt: getCloudSafeImage(booking.paymentReceipt),
     full_payment_method: booking.fullPaymentMethod || "",
-    full_payment_receipt: booking.fullPaymentReceipt || "",
+    full_payment_receipt: getCloudSafeImage(booking.fullPaymentReceipt),
     full_payment_requested: Boolean(booking.fullPaymentRequested),
     full_payment_received: Boolean(booking.fullPaymentReceived),
     status: booking.status || "Reservation Receive",
@@ -377,6 +381,12 @@ async function uploadImageToStorage(folder, file) {
   if (!backendEnabled) return optimizedImage;
   const path = safeFolder + "/" + Date.now() + "-" + Math.random().toString(36).slice(2) + ".jpg";
   return uploadPublicImage(imageUploadBucket, path, uploadFile);
+}
+
+async function uploadInlineImageToCloud(value, folder) {
+  if (!String(value || "").startsWith("data:")) return value || "";
+  if (!cloudinaryEnabled) throw new Error("Cloudinary is not configured for receipt uploads.");
+  return uploadCloudinaryImageViaServer(value, folder);
 }
 
 function loadCloudinaryWidget() {
@@ -2798,7 +2808,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
     setFullPaymentMessage("");
   };
 
-  const submitFullPaymentProof = () => {
+  const submitFullPaymentProof = async () => {
     const booking = findFullPaymentBooking();
     if (!booking) {
       setFullPaymentResult(null);
@@ -2819,16 +2829,28 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
       setFullPaymentMessage("Please attach your full payment receipt before submitting.");
       return;
     }
+    let uploadedFullPaymentReceipt = fullPaymentForm.paymentReceipt;
+    try {
+      uploadedFullPaymentReceipt = await uploadInlineImageToCloud(fullPaymentForm.paymentReceipt, "little-jessie/rentals/full-payments");
+    } catch (error) {
+      console.error(error);
+      setFullPaymentMessage("Full payment receipt upload failed: " + error.message);
+      return;
+    }
+
     const nextBookings = getRentalBookings().map((item) => item.id === booking.id ? {
       ...item,
       fullPaymentRequested: true,
       fullPaymentMethod: fullPaymentForm.paymentMethod,
-      fullPaymentReceipt: fullPaymentForm.paymentReceipt,
+      fullPaymentReceipt: uploadedFullPaymentReceipt,
       fullPaymentSubmittedAt: new Date().toISOString(),
       status: item.status === "Cancelled" ? "Cancelled" : "Reservation Receive",
     } : item);
     localStorage.setItem(littleJessieRentalStorageKey, JSON.stringify(nextBookings));
     const updatedBooking = nextBookings.find((item) => item.id === booking.id);
+    if (backendEnabled && updatedBooking) {
+      updateRecord("little_jessie_rentals", "id", updatedBooking.id, toDbLittleJessieRental(updatedBooking)).catch(console.error);
+    }
     const totalDue = Number(updatedBooking.totalDue || 0);
     const downpaymentDue = Number(updatedBooking.downpaymentDue || Math.ceil(totalDue * 0.5));
     setFullPaymentResult({ ...updatedBooking, balanceDue: Math.max(totalDue - downpaymentDue, 0) });
@@ -2899,20 +2921,27 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
       fullPaymentReceived: false,
     };
 
-    try {
-      localStorage.setItem(littleJessieRentalStorageKey, JSON.stringify([nextBooking, ...savedBookings]));
-    } catch (error) {
-      console.error(error);
-    }
-
     let onlineSaved = false;
+    let savedBookingRecord = nextBooking;
     if (backendEnabled) {
       try {
-        await insertRecord("little_jessie_rentals", toDbLittleJessieRental(nextBooking));
+        const onlineBooking = {
+          ...nextBooking,
+          referencePhoto: await uploadInlineImageToCloud(nextBooking.referencePhoto, "little-jessie/rentals/reference"),
+          paymentReceipt: await uploadInlineImageToCloud(nextBooking.paymentReceipt, "little-jessie/rentals/payments"),
+        };
+        await insertRecord("little_jessie_rentals", toDbLittleJessieRental(onlineBooking));
+        savedBookingRecord = onlineBooking;
         onlineSaved = true;
       } catch (error) {
         console.error(error);
       }
+    }
+
+    try {
+      localStorage.setItem(littleJessieRentalStorageKey, JSON.stringify([savedBookingRecord, ...savedBookings]));
+    } catch (error) {
+      console.error(error);
     }
 
     setRentalSaved(true);
