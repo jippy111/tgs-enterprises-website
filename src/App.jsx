@@ -1569,7 +1569,16 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
     setProductSaveMessage("Uploading product image...");
     try {
       const image = await uploadImageToStorage("little-jessie/products", file);
-      if (image) updateProduct(id, { image });
+      if (image) {
+        const nextProducts = products.map((product) => product.id === id ? { ...product, image } : product);
+        saveProducts(nextProducts);
+        if (publishProductsOnline) {
+          setProductSaveMessage("Publishing product image online...");
+          const published = await publishProductsOnline(nextProducts);
+          const cloudError = localStorage.getItem(littleJessieCloudErrorStorageKey);
+          setProductSaveMessage(published ? "Product image is live online." : "Saved on this browser only. Cloud publish failed: " + (cloudError || "Please check Supabase setup."));
+        }
+      }
     } catch (error) {
       console.error(error);
       localStorage.setItem(littleJessieCloudErrorStorageKey, error.message);
@@ -2206,7 +2215,15 @@ function AdminPanel({ productsCatalog, setProductsCatalog, publishProductsOnline
     setProductSaveMessage("Uploading bag image...");
     try {
       const image = await uploadImageToStorage("tgs/products", file);
-      if (image) updateProduct(id, { image });
+      if (image) {
+        const nextProducts = productsCatalog.map((product) => product.id === id ? { ...product, image } : product);
+        saveProducts(nextProducts);
+        if (publishProductsOnline) {
+          setProductSaveMessage("Publishing bag image online...");
+          const published = await publishProductsOnline(nextProducts);
+          setProductSaveMessage(published ? "Bag image is live online." : "Saved on this browser only. Cloud publish needs checking.");
+        }
+      }
     } catch (error) {
       console.error(error);
       setProductSaveMessage("Saved on this browser only. Cloud image upload failed: " + error.message);
