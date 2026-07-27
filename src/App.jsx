@@ -1642,7 +1642,7 @@ function AdminPaymentRecords({ orders }) {
   );
 }
 
-function AdminDashboard({ orders, setOrders, productsCatalog, setProductsCatalog, littleJessieProducts, setLittleJessieProducts, littleJessieGallery, setLittleJessieGallery, onLogout }) {
+function AdminDashboard({ orders, setOrders, productsCatalog, setProductsCatalog, publishTgsProducts, littleJessieProducts, setLittleJessieProducts, littleJessieGallery, setLittleJessieGallery, onLogout }) {
   return (
     <div id="admin">
       <section className="border-t border-[#ead9a8]/70 bg-neutral-950 py-8 text-white">
@@ -1656,7 +1656,7 @@ function AdminDashboard({ orders, setOrders, productsCatalog, setProductsCatalog
       </section>
       <AdminPaymentRecords orders={orders} />
       <AdminOrdersPanel orders={orders} setOrders={setOrders} />
-      <AdminPanel productsCatalog={productsCatalog} setProductsCatalog={setProductsCatalog} />
+      <AdminPanel productsCatalog={productsCatalog} setProductsCatalog={setProductsCatalog} publishProductsOnline={publishTgsProducts} />
       <LittleJessieAdminPanel products={littleJessieProducts} setProducts={setLittleJessieProducts} />
       <LittleJessieRentalScheduleAdminPanel />
       <LittleJessieRentalAdminPanel />
@@ -1827,7 +1827,7 @@ function AdminColorManager({ product, onAddColor, onRemoveColor }) {
   );
 }
 
-function AdminPanel({ productsCatalog, setProductsCatalog }) {
+function AdminPanel({ productsCatalog, setProductsCatalog, publishProductsOnline }) {
   const emptyDraft = {
     name: "",
     category: "Tote Bags",
@@ -1847,6 +1847,14 @@ function AdminPanel({ productsCatalog, setProductsCatalog }) {
   };
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState(null);
+  const [productSaveMessage, setProductSaveMessage] = useState("");
+  const publishTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (publishTimerRef.current) window.clearTimeout(publishTimerRef.current);
+    };
+  }, []);
 
   const parseList = (value) =>
     value
@@ -1860,6 +1868,13 @@ function AdminPanel({ productsCatalog, setProductsCatalog }) {
   const saveProducts = (nextProducts) => {
     setProductsCatalog(nextProducts);
     localStorage.setItem(productStorageKey, JSON.stringify(nextProducts));
+    if (!publishProductsOnline) return;
+    setProductSaveMessage("Saving bag changes online...");
+    if (publishTimerRef.current) window.clearTimeout(publishTimerRef.current);
+    publishTimerRef.current = window.setTimeout(async () => {
+      const published = await publishProductsOnline(nextProducts);
+      setProductSaveMessage(published ? "Bag changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+    }, 900);
   };
 
   const updateProduct = (id, updates) => {
@@ -1973,8 +1988,17 @@ function AdminPanel({ productsCatalog, setProductsCatalog }) {
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b78a1f]">Admin Panel</p>
             <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Manage Bag Details</h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600">Add new bags from the form below. To keep this page tidy, each product shows a compact summary first; open Edit when you need to update the full details.</p>
+            {productSaveMessage && <p className="mt-3 w-fit border border-[#ead9a8] bg-[#fff9ed] px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-[#8a6412]">{productSaveMessage}</p>}
           </div>
-          <button type="button" onClick={resetProducts} className="w-fit border border-neutral-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-neutral-950 hover:text-white">Reset TGS Products</button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button type="button" onClick={async () => {
+              if (!publishProductsOnline) return;
+              setProductSaveMessage("Publishing bag changes online...");
+              const published = await publishProductsOnline(productsCatalog);
+              setProductSaveMessage(published ? "Bag changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+            }} className="w-fit bg-neutral-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-[#9f7418]">Publish Bag Changes</button>
+            <button type="button" onClick={resetProducts} className="w-fit border border-neutral-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-neutral-950 hover:text-white">Reset TGS Products</button>
+          </div>
         </div>
 
         <form onSubmit={addProduct} className="mb-8 grid gap-4 border border-[#ead9a8]/70 bg-[#fff9ed] p-5 shadow-[0_18px_45px_rgba(17,17,17,0.06)] lg:grid-cols-4">
@@ -3213,6 +3237,34 @@ export default function App() {
     syncBackendCollection("little_jessie_gallery", "id", littleJessieGallery, littleJessieGalleryIdsRef, toDbLittleJessieGallery).catch(console.error);
   }, [littleJessieGallery, cloudReady, adminUnlocked]);
 
+  const publishTgsProducts = async (nextProducts = productsCatalog) => {
+    localStorage.setItem(productStorageKey, JSON.stringify(nextProducts));
+
+    if (!backendEnabled) {
+      setNotice("Bag changes were saved on this browser. Supabase is not configured yet.");
+      window.setTimeout(() => setNotice(""), 3200);
+      return false;
+    }
+
+    try {
+      const cloudProducts = await fetchTable("tgs_products");
+      const nextIds = nextProducts.map((product) => product.id).filter(Boolean);
+      const cloudIds = Array.isArray(cloudProducts) ? cloudProducts.map((product) => product.id).filter(Boolean) : [];
+      const removedIds = cloudIds.filter((id) => !nextIds.includes(id));
+      await Promise.all(removedIds.map((id) => deleteRecord("tgs_products", "id", id)));
+      if (nextProducts.length) await upsertRecords("tgs_products", nextProducts.map(toDbTgsProduct));
+      tgsProductIdsRef.current = nextIds;
+      setNotice("Bag changes are now live online.");
+      window.setTimeout(() => setNotice(""), 3200);
+      return true;
+    } catch (error) {
+      console.error(error);
+      setNotice("Bag changes were saved on this browser, but the online database did not accept the update.");
+      window.setTimeout(() => setNotice(""), 4200);
+      return false;
+    }
+  };
+
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 
   const filteredProducts = useMemo(() => {
@@ -3353,7 +3405,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#fffdf8] text-neutral-950">
         {adminUnlocked ? (
-          <AdminDashboard orders={orders} setOrders={setOrders} productsCatalog={productsCatalog} setProductsCatalog={setProductsCatalog} littleJessieProducts={littleJessieProducts} setLittleJessieProducts={setLittleJessieProducts} littleJessieGallery={littleJessieGallery} setLittleJessieGallery={setLittleJessieGallery} onLogout={logoutAdmin} />
+          <AdminDashboard orders={orders} setOrders={setOrders} productsCatalog={productsCatalog} setProductsCatalog={setProductsCatalog} publishTgsProducts={publishTgsProducts} littleJessieProducts={littleJessieProducts} setLittleJessieProducts={setLittleJessieProducts} littleJessieGallery={littleJessieGallery} setLittleJessieGallery={setLittleJessieGallery} onLogout={logoutAdmin} />
         ) : (
           <AdminLoginPanel onLogin={() => setAdminUnlocked(true)} />
         )}
