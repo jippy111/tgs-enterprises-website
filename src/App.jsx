@@ -3438,6 +3438,9 @@ export default function App() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <button type="button" onClick={() => navigatePath("/")} className="hidden border border-[#ead9a8] bg-[#fff9ed] px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#8a6412] transition hover:bg-[#b78a1f] hover:text-white sm:inline-flex">
+              Our Brands
+            </button>
             <a href="#cart" className="relative grid h-10 min-w-10 place-items-center border border-neutral-200 px-2 text-[11px] font-bold tracking-[0.12em] transition hover:border-[#b78a1f] sm:h-11 sm:min-w-11 sm:px-3 sm:text-xs sm:tracking-[0.16em]" aria-label="Cart">
               BAG
               {cartCount > 0 && <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-[#b78a1f] px-1 text-[11px] text-white">{cartCount}</span>}
@@ -3457,6 +3460,7 @@ export default function App() {
               <button className="grid h-10 w-16 place-items-center border border-neutral-200 text-xs font-bold uppercase tracking-[0.1em]" type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu">Close</button>
             </div>
             <nav className="grid gap-1" aria-label="Mobile navigation">
+              <button type="button" onClick={() => { setMenuOpen(false); navigatePath("/"); }} className="border-b border-neutral-100 py-4 text-left text-base font-semibold text-[#8a6412]">Our Brands</button>
               {navItems.map((item) => (
                 <a key={item} href={"#" + item.toLowerCase()} onClick={() => setMenuOpen(false)} className="border-b border-neutral-100 py-4 text-base font-semibold">{item}</a>
               ))}
