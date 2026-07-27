@@ -27,6 +27,7 @@ const littleJessieGalleryStorageKey = "little-jessie-gallery";
 const littleJessieRentalStorageKey = "little-jessie-rental-bookings";
 const littleJessieRentalScheduleStorageKey = "little-jessie-rental-schedule";
 const littleJessieCloudErrorStorageKey = "little-jessie-cloud-publish-error";
+const littleJessieGalleryCloudErrorStorageKey = "little-jessie-gallery-cloud-publish-error";
 const adminSessionKey = "tgs-admin-session";
 const adminLoginLockKey = "tgs-admin-login-lock";
 const adminPasswordHash = import.meta.env.VITE_ADMIN_PASSWORD_HASH || "15364102026489391938ac9eed936602c1520742890b410b4ca1a4f541fd1e9f";
@@ -1353,7 +1354,8 @@ function LittleJessieGalleryAdmin({ gallery, setGallery, publishGalleryOnline })
     if (publishTimerRef.current) window.clearTimeout(publishTimerRef.current);
     publishTimerRef.current = window.setTimeout(async () => {
       const published = await publishGalleryOnline(nextGallery);
-      setGallerySaveMessage(published ? "Gallery changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+      const cloudError = localStorage.getItem(littleJessieGalleryCloudErrorStorageKey);
+      setGallerySaveMessage(published ? "Gallery changes are live online." : "Saved on this browser only. Cloud publish failed: " + (cloudError || "Please check Supabase setup."));
     }, 900);
   };
 
@@ -1387,7 +1389,14 @@ function LittleJessieGalleryAdmin({ gallery, setGallery, publishGalleryOnline })
 
   const removeItem = (id) => {
     if (!window.confirm("Remove this gallery item?")) return;
-    saveGallery(gallery.filter((item) => item.id !== id));
+    const nextGallery = gallery.filter((item) => item.id !== id);
+    saveGallery(nextGallery);
+    if (publishGalleryOnline) {
+      publishGalleryOnline(nextGallery, { removeMissing: true }).then((published) => {
+        const cloudError = localStorage.getItem(littleJessieGalleryCloudErrorStorageKey);
+        setGallerySaveMessage(published ? "Gallery changes are live online." : "Saved on this browser only. Cloud publish failed: " + (cloudError || "Please check Supabase setup."));
+      });
+    }
     setEditingId(null);
   };
 
@@ -1395,6 +1404,12 @@ function LittleJessieGalleryAdmin({ gallery, setGallery, publishGalleryOnline })
     if (!window.confirm("Reset gallery to starter Little Jessie entries?")) return;
     localStorage.removeItem(littleJessieGalleryStorageKey);
     saveGallery(defaultLittleJessieGallery);
+    if (publishGalleryOnline) {
+      publishGalleryOnline(defaultLittleJessieGallery, { removeMissing: true }).then((published) => {
+        const cloudError = localStorage.getItem(littleJessieGalleryCloudErrorStorageKey);
+        setGallerySaveMessage(published ? "Gallery changes are live online." : "Saved on this browser only. Cloud publish failed: " + (cloudError || "Please check Supabase setup."));
+      });
+    }
     setEditingId(null);
   };
 
@@ -1412,8 +1427,9 @@ function LittleJessieGalleryAdmin({ gallery, setGallery, publishGalleryOnline })
             <button type="button" onClick={async () => {
               if (!publishGalleryOnline) return;
               setGallerySaveMessage("Publishing gallery changes online...");
-              const published = await publishGalleryOnline(gallery);
-              setGallerySaveMessage(published ? "Gallery changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+              const published = await publishGalleryOnline(gallery, { removeMissing: true });
+              const cloudError = localStorage.getItem(littleJessieGalleryCloudErrorStorageKey);
+              setGallerySaveMessage(published ? "Gallery changes are live online." : "Saved on this browser only. Cloud publish failed: " + (cloudError || "Please check Supabase setup."));
             }} className="w-fit bg-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-pink-600">Publish Gallery</button>
             <button type="button" onClick={resetGallery} className="w-fit border border-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-stone-950 hover:text-white">Reset Gallery</button>
           </div>
@@ -3523,30 +3539,35 @@ export default function App() {
     }
   };
 
-  const publishLittleJessieGallery = async (nextGallery = littleJessieGallery) => {
+  const publishLittleJessieGallery = async (nextGallery = littleJessieGallery, options = {}) => {
     localStorage.setItem(littleJessieGalleryStorageKey, JSON.stringify(nextGallery));
 
     if (!backendEnabled) {
+      localStorage.setItem(littleJessieGalleryCloudErrorStorageKey, "Supabase is not configured in Vercel.");
       setNotice("Little Jessie gallery changes were saved on this browser. Supabase is not configured yet.");
       window.setTimeout(() => setNotice(""), 3200);
       return false;
     }
 
     try {
-      const cloudGallery = await fetchTable("little_jessie_gallery");
       const nextIds = nextGallery.map((item) => item.id).filter(Boolean);
-      const cloudIds = Array.isArray(cloudGallery) ? cloudGallery.map((item) => item.id).filter(Boolean) : [];
-      const removedIds = cloudIds.filter((id) => !nextIds.includes(id));
-      await Promise.all(removedIds.map((id) => deleteRecord("little_jessie_gallery", "id", id)));
+      if (options.removeMissing) {
+        const cloudGallery = await fetchTable("little_jessie_gallery");
+        const cloudIds = Array.isArray(cloudGallery) ? cloudGallery.map((item) => item.id).filter(Boolean) : [];
+        const removedIds = cloudIds.filter((id) => !nextIds.includes(id));
+        await Promise.all(removedIds.map((id) => deleteRecord("little_jessie_gallery", "id", id)));
+      }
       if (nextGallery.length) await upsertRecords("little_jessie_gallery", nextGallery.map(toDbLittleJessieGallery), "id");
       littleJessieGalleryIdsRef.current = nextIds;
+      localStorage.removeItem(littleJessieGalleryCloudErrorStorageKey);
       setNotice("Little Jessie gallery changes are now live online.");
       window.setTimeout(() => setNotice(""), 3200);
       return true;
     } catch (error) {
       console.error(error);
-      setNotice("Little Jessie gallery changes were saved on this browser, but the online database did not accept the update.");
-      window.setTimeout(() => setNotice(""), 4200);
+      localStorage.setItem(littleJessieGalleryCloudErrorStorageKey, error.message);
+      setNotice("Little Jessie gallery changes were saved on this browser, but Supabase rejected the online update: " + error.message + ". Check Supabase policies and Vercel environment variables.");
+      window.setTimeout(() => setNotice(""), 7000);
       return false;
     }
   };
