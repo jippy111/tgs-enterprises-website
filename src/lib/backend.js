@@ -6,6 +6,10 @@ const cloudinaryUploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 export const backendEnabled = Boolean(supabaseUrl && supabaseAnonKey);
 export const cloudinaryEnabled = Boolean(cloudinaryCloudName && cloudinaryUploadPreset);
+export const cloudinaryConfig = {
+  cloudName: cloudinaryCloudName,
+  uploadPreset: cloudinaryUploadPreset,
+};
 
 export function readBackendAdminSession() {
   try {

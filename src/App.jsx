@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { categories, formatCurrency, products as defaultProducts } from "./data/products";
-import { backendEnabled, cloudinaryEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signOutBackendAdmin, updateRecord, uploadCloudinaryImage, uploadCloudinaryImageViaServer, uploadPublicImage, upsertRecords } from "./lib/backend";
+import { backendEnabled, cloudinaryConfig, cloudinaryEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signOutBackendAdmin, updateRecord, uploadCloudinaryImage, uploadCloudinaryImageViaServer, uploadPublicImage, upsertRecords } from "./lib/backend";
 
 const navItems = ["Home", "Shop", "Track", "About", "FAQ", "Contact"];
 const logo = "/assets/tgs-logo.jfif";
@@ -36,6 +36,8 @@ const adminMaxLoginAttempts = 5;
 const adminLockDurationMs = 15 * 60 * 1000;
 const discountOptions = Array.from({ length: 26 }, (_, index) => index * 2);
 const orderStatuses = ["Pending", "Paid", "Preparing", "Shipped", "Completed", "Cancelled"];
+const cloudinaryWidgetScript = "https://upload-widget.cloudinary.com/global/all.js";
+let cloudinaryWidgetLoader;
 
 function getDiscountedPrice(product) {
   const discount = Number(product.discount ?? 0);
@@ -375,6 +377,55 @@ async function uploadImageToStorage(folder, file) {
   if (!backendEnabled) return optimizedImage;
   const path = safeFolder + "/" + Date.now() + "-" + Math.random().toString(36).slice(2) + ".jpg";
   return uploadPublicImage(imageUploadBucket, path, uploadFile);
+}
+
+function loadCloudinaryWidget() {
+  if (window.cloudinary?.createUploadWidget) return Promise.resolve();
+  if (cloudinaryWidgetLoader) return cloudinaryWidgetLoader;
+  cloudinaryWidgetLoader = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = cloudinaryWidgetScript;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Cloudinary upload widget could not load."));
+    document.body.appendChild(script);
+  });
+  return cloudinaryWidgetLoader;
+}
+
+async function chooseCloudinaryImage(folder) {
+  if (!cloudinaryEnabled || !cloudinaryConfig.cloudName || !cloudinaryConfig.uploadPreset) {
+    throw new Error("Cloudinary is not configured in Vercel.");
+  }
+  await loadCloudinaryWidget();
+  return new Promise((resolve, reject) => {
+    let completed = false;
+    const widget = window.cloudinary.createUploadWidget(
+      {
+        cloudName: cloudinaryConfig.cloudName,
+        uploadPreset: cloudinaryConfig.uploadPreset,
+        folder: String(folder || "tgs-enterprises").replace(/[^a-z0-9/_-]/gi, "-").toLowerCase(),
+        sources: ["local", "camera"],
+        multiple: false,
+        maxFiles: 1,
+        resourceType: "image",
+        clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+      },
+      (error, result) => {
+        if (error) {
+          completed = true;
+          reject(new Error(error.message || "Cloudinary widget upload failed."));
+          return;
+        }
+        if (result?.event === "success") {
+          completed = true;
+          resolve(result.info.secure_url);
+        }
+        if (result?.event === "close" && !completed) resolve("");
+      },
+    );
+    widget.open();
+  });
 }
 
 async function syncBackendCollection(table, primaryKey, items, previousIdsRef, toDb) {
@@ -1610,6 +1661,44 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
     }
   };
 
+  const chooseDraftImageFromCloudinary = async () => {
+    setProductSaveMessage("Opening Cloudinary uploader...");
+    try {
+      const image = await chooseCloudinaryImage("little-jessie/products");
+      if (image) {
+        setDraft((current) => ({ ...current, image }));
+        setProductSaveMessage("Product image selected from Cloudinary.");
+      } else {
+        setProductSaveMessage("");
+      }
+    } catch (error) {
+      console.error(error);
+      setProductSaveMessage("Cloudinary uploader failed: " + error.message);
+    }
+  };
+
+  const chooseProductImageFromCloudinary = async (id) => {
+    setProductSaveMessage("Opening Cloudinary uploader...");
+    try {
+      const image = await chooseCloudinaryImage("little-jessie/products");
+      if (!image) {
+        setProductSaveMessage("");
+        return;
+      }
+      const nextProducts = products.map((product) => product.id === id ? { ...product, image } : product);
+      saveProducts(nextProducts);
+      if (publishProductsOnline) {
+        setProductSaveMessage("Publishing product image online...");
+        const published = await publishProductsOnline(nextProducts);
+        const cloudError = localStorage.getItem(littleJessieCloudErrorStorageKey);
+        setProductSaveMessage(published ? "Product image is live online." : "Saved on this browser only. Cloud publish failed: " + (cloudError || "Please check Supabase setup."));
+      }
+    } catch (error) {
+      console.error(error);
+      setProductSaveMessage("Cloudinary uploader failed: " + error.message);
+    }
+  };
+
   const addProduct = (event) => {
     event.preventDefault();
     const product = {
@@ -1702,6 +1791,7 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
           </select>
           <input value={draft.image} onChange={(event) => setDraft({ ...draft, image: event.target.value })} placeholder="Cloudinary image URL" className="min-w-0 border border-stone-200 px-4 py-3 outline-none focus:border-pink-300 lg:col-span-2" />
           <input type="file" accept="image/*" onChange={(event) => uploadDraftImage(event.target.files?.[0])} className="min-w-0 border border-stone-200 bg-white px-4 py-3 text-sm" />
+          <button type="button" onClick={chooseDraftImageFromCloudinary} className="border border-pink-200 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-pink-600 transition hover:bg-pink-500 hover:text-white">Upload With Cloudinary</button>
           <textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Product description" className="min-h-24 min-w-0 border border-stone-200 px-4 py-3 outline-none focus:border-pink-300 lg:col-span-2" />
           <button type="submit" className="bg-stone-950 px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-pink-600">Add Product</button>
         </form>
@@ -1736,6 +1826,7 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
                       <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Availability<select value={String(product.available !== false)} onChange={(event) => updateProduct(product.id, { available: event.target.value === "true" })} className="border border-stone-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-pink-300"><option value="true">Visible / Available</option><option value="false">Hidden / Unavailable</option></select></label>
                       <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-stone-500 md:col-span-2">Cloudinary Image URL<input value={String(product.image || "").startsWith("data:") ? "" : product.image || ""} onChange={(event) => updateProduct(product.id, { image: event.target.value })} placeholder="Paste secure_url from Cloudinary" className="border border-stone-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-pink-300" /></label>
                       <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-stone-500 md:col-span-2">Product Photo<input type="file" accept="image/*" onChange={(event) => uploadImage(product.id, event.target.files?.[0])} className="border border-stone-200 px-3 py-2 text-sm font-normal normal-case tracking-normal" /></label>
+                      <button type="button" onClick={() => chooseProductImageFromCloudinary(product.id)} className="border border-pink-200 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-pink-600 transition hover:bg-pink-500 hover:text-white md:col-span-2">Upload With Cloudinary</button>
                     </div>
                     <label className="mt-4 grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-stone-500">Product Description<textarea value={product.description || ""} onChange={(event) => updateProduct(product.id, { description: event.target.value })} className="min-h-24 border border-stone-200 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-pink-300" /></label>
                     <button type="button" onClick={() => removeProduct(product.id)} className="mt-4 border border-red-200 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-red-600 transition hover:bg-red-600 hover:text-white">Remove Product</button>
@@ -2255,6 +2346,43 @@ function AdminPanel({ productsCatalog, setProductsCatalog, publishProductsOnline
     }
   };
 
+  const chooseDraftImageFromCloudinary = async () => {
+    setProductSaveMessage("Opening Cloudinary uploader...");
+    try {
+      const image = await chooseCloudinaryImage("tgs/products");
+      if (image) {
+        setDraft((current) => ({ ...current, image }));
+        setProductSaveMessage("Bag image selected from Cloudinary.");
+      } else {
+        setProductSaveMessage("");
+      }
+    } catch (error) {
+      console.error(error);
+      setProductSaveMessage("Cloudinary uploader failed: " + error.message);
+    }
+  };
+
+  const chooseProductImageFromCloudinary = async (id) => {
+    setProductSaveMessage("Opening Cloudinary uploader...");
+    try {
+      const image = await chooseCloudinaryImage("tgs/products");
+      if (!image) {
+        setProductSaveMessage("");
+        return;
+      }
+      const nextProducts = productsCatalog.map((product) => product.id === id ? { ...product, image } : product);
+      saveProducts(nextProducts);
+      if (publishProductsOnline) {
+        setProductSaveMessage("Publishing bag image online...");
+        const published = await publishProductsOnline(nextProducts);
+        setProductSaveMessage(published ? "Bag image is live online." : "Saved on this browser only. Cloud publish needs checking.");
+      }
+    } catch (error) {
+      console.error(error);
+      setProductSaveMessage("Cloudinary uploader failed: " + error.message);
+    }
+  };
+
   const addProduct = (event) => {
     event.preventDefault();
     const colors = parseList(draft.colors || "Custom");
@@ -2337,6 +2465,7 @@ function AdminPanel({ productsCatalog, setProductsCatalog, publishProductsOnline
           <select value={draft.available} onChange={(event) => setDraft({ ...draft, available: event.target.value })} className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f]"><option value="true">Available</option><option value="false">Unavailable</option></select>
           <input value={draft.image} onChange={(event) => setDraft({ ...draft, image: event.target.value })} placeholder="Cloudinary image URL" className="min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f] lg:col-span-2" />
           <input type="file" accept="image/*" onChange={(event) => uploadDraftImage(event.target.files?.[0])} className="min-w-0 border border-neutral-200 bg-white px-4 py-3 text-sm" />
+          <button type="button" onClick={chooseDraftImageFromCloudinary} className="border border-[#d8bf73] px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#8a6412] transition hover:bg-[#b78a1f] hover:text-white">Upload With Cloudinary</button>
           <button type="submit" className="bg-neutral-950 px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#9f7418]">Add Bag</button>
           <textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Short product description" className="min-h-24 min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f] lg:col-span-2" />
           <textarea value={draft.details} onChange={(event) => setDraft({ ...draft, details: event.target.value })} placeholder="Product details, one per line" className="min-h-24 min-w-0 border border-neutral-200 px-4 py-3 outline-none focus:border-[#b78a1f] lg:col-span-2" />
@@ -2428,6 +2557,7 @@ function AdminPanel({ productsCatalog, setProductsCatalog, publishProductsOnline
                       Product Photo
                       <input type="file" accept="image/*" onChange={(event) => uploadImage(product.id, event.target.files?.[0])} className="border border-neutral-200 px-3 py-2 text-sm font-normal normal-case tracking-normal" />
                     </label>
+                    <button type="button" onClick={() => chooseProductImageFromCloudinary(product.id)} className="mt-4 border border-[#d8bf73] px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[#8a6412] transition hover:bg-[#b78a1f] hover:text-white">Upload With Cloudinary</button>
 
                     <label className="mt-4 grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
                       Product Description
