@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { categories, formatCurrency, products as defaultProducts } from "./data/products";
-import { backendEnabled, deleteRecord, fetchTable, insertRecord, signOutBackendAdmin, upsertRecords } from "./lib/backend";
+import { backendEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signOutBackendAdmin, updateRecord, upsertRecords } from "./lib/backend";
 
 const navItems = ["Home", "Shop", "Track", "About", "FAQ", "Contact"];
 const logo = "/assets/tgs-logo.jfif";
@@ -208,6 +208,88 @@ function fromDbLittleJessieGallery(item) {
     title: item.title,
     detail: item.detail || "",
     image: item.image || "",
+  };
+}
+
+function toDbLittleJessieRental(booking) {
+  return {
+    id: booking.id,
+    reservation_code: booking.reservationCode,
+    customer: {
+      fullName: booking.fullName || "",
+      mobile: booking.mobile || "",
+      email: booking.email || "",
+    },
+    rental_details: {
+      rentalType: booking.rentalType || "",
+      rentalPackage: booking.rentalPackage || "",
+      celebrantName: booking.celebrantName || "",
+      referencePhoto: booking.referencePhoto || "",
+      eventDate: booking.eventDate || "",
+      eventTime: booking.eventTime || "",
+      eventType: booking.eventType || "",
+      eventLocationArea: booking.eventLocationArea || "",
+      venueAddress: booking.venueAddress || "",
+      packageNotes: booking.packageNotes || "",
+      downpaymentPolicy: booking.downpaymentPolicy || "",
+      balanceAfterInitialPayment: Number(booking.balanceAfterInitialPayment || 0),
+    },
+    package_price: Number(booking.packagePrice || 0),
+    transportation_fee: Number(booking.transportationFee || 0),
+    total_due: Number(booking.totalDue || 0),
+    downpayment_due: Number(booking.downpaymentDue || 0),
+    initial_payment_type: booking.initialPaymentType || booking.paymentOption || "50% down payment",
+    initial_payment_due: Number(booking.initialPaymentDue || 0),
+    payment_method: booking.paymentMethod || "",
+    payment_receipt: booking.paymentReceipt || "",
+    full_payment_method: booking.fullPaymentMethod || "",
+    full_payment_receipt: booking.fullPaymentReceipt || "",
+    full_payment_requested: Boolean(booking.fullPaymentRequested),
+    full_payment_received: Boolean(booking.fullPaymentReceived),
+    status: booking.status || "Reservation Receive",
+    cancellation_note: booking.cancellationNote || "",
+    created_at: booking.createdAt || new Date().toISOString(),
+    updated_at: booking.updatedAt || new Date().toISOString(),
+  };
+}
+
+function fromDbLittleJessieRental(booking) {
+  const customer = booking.customer || {};
+  const details = booking.rental_details || {};
+  return {
+    id: booking.id,
+    reservationCode: booking.reservation_code,
+    createdAt: booking.created_at,
+    updatedAt: booking.updated_at,
+    status: booking.status || "Reservation Receive",
+    fullName: customer.fullName || "",
+    mobile: customer.mobile || "",
+    email: customer.email || "",
+    rentalType: details.rentalType || "",
+    rentalPackage: details.rentalPackage || "",
+    celebrantName: details.celebrantName || "",
+    referencePhoto: details.referencePhoto || "",
+    eventDate: details.eventDate || "",
+    eventTime: details.eventTime || "",
+    eventType: details.eventType || "",
+    eventLocationArea: details.eventLocationArea || "",
+    venueAddress: details.venueAddress || "",
+    packageNotes: details.packageNotes || "",
+    downpaymentPolicy: details.downpaymentPolicy || "",
+    packagePrice: Number(booking.package_price || 0),
+    transportationFee: Number(booking.transportation_fee || 0),
+    totalDue: Number(booking.total_due || 0),
+    downpaymentDue: Number(booking.downpayment_due || 0),
+    initialPaymentType: booking.initial_payment_type || "50% down payment",
+    initialPaymentDue: Number(booking.initial_payment_due || 0),
+    balanceAfterInitialPayment: Number(details.balanceAfterInitialPayment || 0),
+    paymentMethod: booking.payment_method || "",
+    paymentReceipt: booking.payment_receipt || "",
+    fullPaymentMethod: booking.full_payment_method || "",
+    fullPaymentReceipt: booking.full_payment_receipt || "",
+    fullPaymentRequested: Boolean(booking.full_payment_requested),
+    fullPaymentReceived: Boolean(booking.full_payment_received),
+    cancellationNote: booking.cancellation_note || "",
   };
 }
 
@@ -1146,6 +1228,19 @@ function LittleJessieRentalAdminPanel() {
       return normalizedBookings;
     } catch { return []; }
   });
+
+  useEffect(() => {
+    if (!backendEnabled) return;
+    fetchTable("little_jessie_rentals")
+      .then((cloudBookings) => {
+        if (!Array.isArray(cloudBookings)) return;
+        const nextBookings = cloudBookings.map(fromDbLittleJessieRental).sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+        setBookings(nextBookings);
+        localStorage.setItem(littleJessieRentalStorageKey, JSON.stringify(nextBookings));
+      })
+      .catch(console.error);
+  }, []);
+
   const updateBooking = (id, updates) => {
     const normalizedUpdates = { ...updates };
     if (normalizedUpdates.status === "Full Payment Receive") normalizedUpdates.fullPaymentReceived = true;
@@ -1153,6 +1248,10 @@ function LittleJessieRentalAdminPanel() {
     const nextBookings = bookings.map((booking) => booking.id === id ? { ...booking, ...normalizedUpdates, updatedAt: new Date().toISOString() } : booking);
     setBookings(nextBookings);
     localStorage.setItem(littleJessieRentalStorageKey, JSON.stringify(nextBookings));
+    const updatedBooking = nextBookings.find((booking) => booking.id === id);
+    if (backendEnabled && updatedBooking) {
+      updateRecord("little_jessie_rentals", "id", id, toDbLittleJessieRental(updatedBooking)).catch(console.error);
+    }
   };
   const clearBookings = () => {
     if (!window.confirm("Clear all Little Jessie rental bookings from this browser?")) return;
@@ -2219,6 +2318,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
   });
   const [rentalSaved, setRentalSaved] = useState(false);
   const [rentalMessage, setRentalMessage] = useState("");
+  const [rentalSubmitting, setRentalSubmitting] = useState(false);
   const [fullPaymentOpen, setFullPaymentOpen] = useState(false);
   const [fullPaymentForm, setFullPaymentForm] = useState({
     celebrantName: "",
@@ -2434,15 +2534,18 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
     return "";
   };
 
-  const saveRentalBooking = (event) => {
+  const saveRentalBooking = async (event) => {
     event.preventDefault();
+    if (rentalSubmitting) return;
     const validationMessage = validateRentalBookingTime();
     if (validationMessage) {
       setRentalSaved(false);
       setRentalMessage(validationMessage);
+      window.setTimeout(() => document.getElementById("rental-submit-status")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
       return;
     }
 
+    setRentalSubmitting(true);
     const savedBookings = getRentalBookings();
     const nextReservationNumber = savedBookings.reduce((max, booking) => {
       const match = String(booking.reservationCode || "").match(/LJS-(\d+)/i);
@@ -2467,10 +2570,26 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
       fullPaymentReceived: false,
     };
 
-    localStorage.setItem(littleJessieRentalStorageKey, JSON.stringify([nextBooking, ...savedBookings]));
+    try {
+      localStorage.setItem(littleJessieRentalStorageKey, JSON.stringify([nextBooking, ...savedBookings]));
+    } catch (error) {
+      console.error(error);
+    }
+
+    let onlineSaved = false;
+    if (backendEnabled) {
+      try {
+        await insertRecord("little_jessie_rentals", toDbLittleJessieRental(nextBooking));
+        onlineSaved = true;
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
     setRentalSaved(true);
-    setRentalMessage("SCHEDULE SUBMITTED. Your reservation code is " + reservationCode + ". Please keep this code for payment follow-up. Reservation is confirmed after admin verifies your " + (rentalBooking.paymentOption === "Full payment" ? "full payment" : "50% down payment") + ". Transportation fee is based on your selected event location.");
+    setRentalMessage("SCHEDULE SUBMITTED. Your reservation code is " + reservationCode + ". Please keep this code for payment follow-up. Reservation is confirmed after admin verifies your " + (rentalBooking.paymentOption === "Full payment" ? "full payment" : "50% down payment") + ". Transportation fee is based on your selected event location." + (onlineSaved ? " Your booking was also sent to our online admin records." : " If admin cannot see this immediately, please send your reservation code to Little Jessie Studyo."));
     window.setTimeout(() => document.getElementById("rental-submit-status")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    setRentalSubmitting(false);
     setRentalBooking({
       fullName: "",
       mobile: "",
@@ -2796,7 +2915,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
                 <p className="mt-2 text-stone-600">Cancellation of the confirmed event is non-refundable.</p>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <button type="submit" disabled={rentalDateFullyBooked} className="w-full bg-stone-950 px-5 py-3 text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500">{rentalSaved ? "Schedule Submitted" : rentalDateFullyBooked ? "Date Fully Booked" : "Proceed to Checkout"}</button>
+                <button type="submit" disabled={rentalDateFullyBooked || rentalSubmitting} className="w-full bg-stone-950 px-5 py-3 text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500">{rentalSubmitting ? "Submitting..." : rentalSaved ? "Schedule Submitted" : rentalDateFullyBooked ? "Date Fully Booked" : "Proceed to Checkout"}</button>
                 <button type="button" onClick={openFullPaymentModal} className="w-full border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 hover:border-pink-300">Settle Full Payment</button>
               </div>
             </form>
