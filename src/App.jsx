@@ -3607,9 +3607,9 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [search, setSearch] = useState("");
-  const [productsCatalog, setProductsCatalog] = useState(readSavedProducts);
-  const [littleJessieProducts, setLittleJessieProducts] = useState(readLittleJessieProducts);
-  const [littleJessieGallery, setLittleJessieGallery] = useState(readLittleJessieGallery);
+  const [productsCatalog, setProductsCatalog] = useState(() => backendEnabled ? defaultProducts : readSavedProducts());
+  const [littleJessieProducts, setLittleJessieProducts] = useState(() => backendEnabled ? defaultLittleJessieProducts : readLittleJessieProducts());
+  const [littleJessieGallery, setLittleJessieGallery] = useState(() => backendEnabled ? defaultLittleJessieGallery : readLittleJessieGallery());
   const [cartItems, setCartItems] = useState(readSavedCart);
   const [orders, setOrders] = useState(readSavedOrders);
   const [adminUnlocked, setAdminUnlocked] = useState(readAdminSession);
