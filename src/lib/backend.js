@@ -182,3 +182,26 @@ export async function uploadCloudinaryImage(file, folder = "tgs-enterprises") {
   const payload = await response.json();
   return payload.secure_url;
 }
+
+export async function uploadCloudinaryImageViaServer(image, folder = "tgs-enterprises") {
+  const response = await fetch("/api/cloudinary-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image, folder }),
+  });
+
+  if (!response.ok) {
+    let details = "";
+    try {
+      const payload = await response.json();
+      details = payload.error || payload.message || "";
+    } catch {
+      details = await response.text().catch(() => "");
+    }
+    throw new Error("Server image upload failed: " + response.status + " " + response.statusText + (details ? " - " + details : ""));
+  }
+
+  const payload = await response.json();
+  if (!payload.url) throw new Error("Server image upload did not return an image URL.");
+  return payload.url;
+}

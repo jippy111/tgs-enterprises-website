@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { categories, formatCurrency, products as defaultProducts } from "./data/products";
-import { backendEnabled, cloudinaryEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signOutBackendAdmin, updateRecord, uploadCloudinaryImage, uploadPublicImage, upsertRecords } from "./lib/backend";
+import { backendEnabled, cloudinaryEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signOutBackendAdmin, updateRecord, uploadCloudinaryImage, uploadCloudinaryImageViaServer, uploadPublicImage, upsertRecords } from "./lib/backend";
 
 const navItems = ["Home", "Shop", "Track", "About", "FAQ", "Contact"];
 const logo = "/assets/tgs-logo.jfif";
@@ -361,7 +361,17 @@ async function uploadImageToStorage(folder, file) {
   const blob = dataUrlToBlob(optimizedImage);
   const uploadFile = new File([blob], "upload.jpg", { type: "image/jpeg" });
   const safeFolder = String(folder || "uploads").replace(/[^a-z0-9/_-]/gi, "-").toLowerCase();
-  if (cloudinaryEnabled) return uploadCloudinaryImage(uploadFile, safeFolder);
+  if (cloudinaryEnabled) {
+    try {
+      return await uploadCloudinaryImageViaServer(optimizedImage, safeFolder);
+    } catch (serverError) {
+      try {
+        return await uploadCloudinaryImage(uploadFile, safeFolder);
+      } catch (directError) {
+        throw new Error(serverError.message + " Direct upload also failed: " + directError.message);
+      }
+    }
+  }
   if (!backendEnabled) return optimizedImage;
   const path = safeFolder + "/" + Date.now() + "-" + Math.random().toString(36).slice(2) + ".jpg";
   return uploadPublicImage(imageUploadBucket, path, uploadFile);
