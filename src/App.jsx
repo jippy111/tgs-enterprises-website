@@ -26,6 +26,7 @@ const littleJessieInquiryStorageKey = "little-jessie-inquiries";
 const littleJessieGalleryStorageKey = "little-jessie-gallery";
 const littleJessieRentalStorageKey = "little-jessie-rental-bookings";
 const littleJessieRentalScheduleStorageKey = "little-jessie-rental-schedule";
+const littleJessieCloudErrorStorageKey = "little-jessie-cloud-publish-error";
 const adminSessionKey = "tgs-admin-session";
 const adminLoginLockKey = "tgs-admin-login-lock";
 const adminPasswordHash = import.meta.env.VITE_ADMIN_PASSWORD_HASH || "15364102026489391938ac9eed936602c1520742890b410b4ca1a4f541fd1e9f";
@@ -1485,7 +1486,8 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
     if (publishTimerRef.current) window.clearTimeout(publishTimerRef.current);
     publishTimerRef.current = window.setTimeout(async () => {
       const published = await publishProductsOnline(nextProducts);
-      setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+      const cloudError = localStorage.getItem(littleJessieCloudErrorStorageKey);
+      setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish failed: " + (cloudError || "Please check Supabase setup."));
     }, 900);
   };
 
@@ -1527,7 +1529,8 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
     saveProducts(nextProducts);
     if (publishProductsOnline) {
       publishProductsOnline(nextProducts, { removeMissing: true }).then((published) => {
-        setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+        const cloudError = localStorage.getItem(littleJessieCloudErrorStorageKey);
+        setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish failed: " + (cloudError || "Please check Supabase setup."));
       });
     }
     setEditingId(null);
@@ -1539,7 +1542,8 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
     saveProducts(defaultLittleJessieProducts);
     if (publishProductsOnline) {
       publishProductsOnline(defaultLittleJessieProducts, { removeMissing: true }).then((published) => {
-        setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+        const cloudError = localStorage.getItem(littleJessieCloudErrorStorageKey);
+        setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish failed: " + (cloudError || "Please check Supabase setup."));
       });
     }
     setEditingId(null);
@@ -1572,7 +1576,8 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
               if (!publishProductsOnline) return;
               setProductSaveMessage("Publishing Little Jessie changes online...");
               const published = await publishProductsOnline(products, { removeMissing: true });
-              setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+              const cloudError = localStorage.getItem(littleJessieCloudErrorStorageKey);
+              setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish failed: " + (cloudError || "Please check Supabase setup."));
             }} className="w-fit bg-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-pink-600">Publish Products</button>
             <button type="button" onClick={resetProducts} className="w-fit border border-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-stone-950 hover:text-white">Reset Little Jessie Products</button>
           </div>
@@ -3489,6 +3494,7 @@ export default function App() {
     localStorage.setItem(littleJessieProductStorageKey, JSON.stringify(nextProducts));
 
     if (!backendEnabled) {
+      localStorage.setItem(littleJessieCloudErrorStorageKey, "Supabase is not configured in Vercel.");
       setNotice("Little Jessie product changes were saved on this browser. Supabase is not configured yet.");
       window.setTimeout(() => setNotice(""), 3200);
       return false;
@@ -3504,11 +3510,13 @@ export default function App() {
       }
       if (nextProducts.length) await upsertRecords("little_jessie_products", nextProducts.map(toDbLittleJessieProduct), "id");
       littleJessieProductIdsRef.current = nextIds;
+      localStorage.removeItem(littleJessieCloudErrorStorageKey);
       setNotice("Little Jessie product changes are now live online.");
       window.setTimeout(() => setNotice(""), 3200);
       return true;
     } catch (error) {
       console.error(error);
+      localStorage.setItem(littleJessieCloudErrorStorageKey, error.message);
       setNotice("Little Jessie product changes were saved on this browser, but Supabase rejected the online update: " + error.message + ". Check Supabase policies and Vercel environment variables.");
       window.setTimeout(() => setNotice(""), 7000);
       return false;
