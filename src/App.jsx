@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { categories, formatCurrency, products as defaultProducts } from "./data/products";
-import { backendEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signOutBackendAdmin, updateRecord, uploadPublicImage, upsertRecords } from "./lib/backend";
+import { backendEnabled, cloudinaryEnabled, deleteRecord, fetchTable, hasBackendAdminSession, insertRecord, signOutBackendAdmin, updateRecord, uploadCloudinaryImage, uploadPublicImage, upsertRecords } from "./lib/backend";
 
 const navItems = ["Home", "Shop", "Track", "About", "FAQ", "Contact"];
 const logo = "/assets/tgs-logo.jfif";
@@ -358,11 +358,13 @@ function resizeImageFile(file, maxSize = 1100, quality = 0.78, targetBytes = 420
 
 async function uploadImageToStorage(folder, file) {
   const optimizedImage = await resizeImageFile(file);
-  if (!backendEnabled) return optimizedImage;
   const blob = dataUrlToBlob(optimizedImage);
+  const uploadFile = new File([blob], "upload.jpg", { type: "image/jpeg" });
   const safeFolder = String(folder || "uploads").replace(/[^a-z0-9/_-]/gi, "-").toLowerCase();
+  if (cloudinaryEnabled) return uploadCloudinaryImage(uploadFile, safeFolder);
+  if (!backendEnabled) return optimizedImage;
   const path = safeFolder + "/" + Date.now() + "-" + Math.random().toString(36).slice(2) + ".jpg";
-  return uploadPublicImage(imageUploadBucket, path, blob);
+  return uploadPublicImage(imageUploadBucket, path, uploadFile);
 }
 
 async function syncBackendCollection(table, primaryKey, items, previousIdsRef, toDb) {
@@ -1418,7 +1420,7 @@ function LittleJessieGalleryAdmin({ gallery, setGallery, publishGalleryOnline })
     try {
       const image = await uploadImageToStorage("little-jessie/gallery", file);
       if (image) setDraft((current) => ({ ...current, image }));
-      setGallerySaveMessage(image && backendEnabled ? "Gallery image uploaded online." : "Gallery image ready.");
+      setGallerySaveMessage(image && (cloudinaryEnabled || backendEnabled) ? "Gallery image uploaded online." : "Gallery image ready.");
     } catch (error) {
       console.error(error);
       localStorage.setItem(littleJessieGalleryCloudErrorStorageKey, error.message);
@@ -1581,7 +1583,7 @@ function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }
     try {
       const image = await uploadImageToStorage("little-jessie/products", file);
       if (image) setDraft((current) => ({ ...current, image }));
-      setProductSaveMessage(image && backendEnabled ? "Product image uploaded online." : "Product image ready.");
+      setProductSaveMessage(image && (cloudinaryEnabled || backendEnabled) ? "Product image uploaded online." : "Product image ready.");
     } catch (error) {
       console.error(error);
       localStorage.setItem(littleJessieCloudErrorStorageKey, error.message);
@@ -2217,7 +2219,7 @@ function AdminPanel({ productsCatalog, setProductsCatalog, publishProductsOnline
     try {
       const image = await uploadImageToStorage("tgs/products", file);
       if (image) setDraft((current) => ({ ...current, image }));
-      setProductSaveMessage(image && backendEnabled ? "Bag image uploaded online." : "Bag image ready.");
+      setProductSaveMessage(image && (cloudinaryEnabled || backendEnabled) ? "Bag image uploaded online." : "Bag image ready.");
     } catch (error) {
       console.error(error);
       setProductSaveMessage("Saved on this browser only. Cloud image upload failed: " + error.message);

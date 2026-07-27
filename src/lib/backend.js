@@ -1,8 +1,11 @@
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabaseAdminSessionKey = "tgs-supabase-admin-session";
+const cloudinaryCloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const cloudinaryUploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 export const backendEnabled = Boolean(supabaseUrl && supabaseAnonKey);
+export const cloudinaryEnabled = Boolean(cloudinaryCloudName && cloudinaryUploadPreset);
 
 export function readBackendAdminSession() {
   try {
@@ -150,4 +153,32 @@ export async function uploadPublicImage(bucket, path, file) {
   }
 
   return supabaseUrl + "/storage/v1/object/public/" + bucket + "/" + path;
+}
+
+export async function uploadCloudinaryImage(file, folder = "tgs-enterprises") {
+  if (!cloudinaryEnabled) throw new Error("Cloudinary is not configured.");
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", cloudinaryUploadPreset);
+  formData.append("folder", folder);
+
+  const response = await fetch("https://api.cloudinary.com/v1_1/" + cloudinaryCloudName + "/image/upload", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let details = "";
+    try {
+      const payload = await response.json();
+      details = payload.error?.message || payload.message || "";
+    } catch {
+      details = await response.text().catch(() => "");
+    }
+    throw new Error("Cloudinary upload failed: " + response.status + " " + response.statusText + (details ? " - " + details : ""));
+  }
+
+  const payload = await response.json();
+  return payload.secure_url;
 }
