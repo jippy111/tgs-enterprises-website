@@ -1198,14 +1198,29 @@ function LittleJessieRentalAdminPanel() {
   );
 }
 
-function LittleJessieGalleryAdmin({ gallery, setGallery }) {
+function LittleJessieGalleryAdmin({ gallery, setGallery, publishGalleryOnline }) {
   const emptyDraft = { title: "", detail: "", image: "" };
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState(null);
+  const [gallerySaveMessage, setGallerySaveMessage] = useState("");
+  const publishTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (publishTimerRef.current) window.clearTimeout(publishTimerRef.current);
+    };
+  }, []);
 
   const saveGallery = (nextGallery) => {
     setGallery(nextGallery);
     localStorage.setItem(littleJessieGalleryStorageKey, JSON.stringify(nextGallery));
+    if (!publishGalleryOnline) return;
+    setGallerySaveMessage("Saving gallery changes online...");
+    if (publishTimerRef.current) window.clearTimeout(publishTimerRef.current);
+    publishTimerRef.current = window.setTimeout(async () => {
+      const published = await publishGalleryOnline(nextGallery);
+      setGallerySaveMessage(published ? "Gallery changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+    }, 900);
   };
 
   const updateItem = (id, updates) => {
@@ -1259,8 +1274,17 @@ function LittleJessieGalleryAdmin({ gallery, setGallery }) {
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-pink-500">Little Jessie Gallery</p>
             <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Past Works Management</h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">Upload real past-work photos and edit the gallery captions shown on the Little Jessie page.</p>
+            {gallerySaveMessage && <p className="mt-3 w-fit border border-pink-100 bg-[#fff8fb] px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-pink-700">{gallerySaveMessage}</p>}
           </div>
-          <button type="button" onClick={resetGallery} className="w-fit border border-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-stone-950 hover:text-white">Reset Gallery</button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button type="button" onClick={async () => {
+              if (!publishGalleryOnline) return;
+              setGallerySaveMessage("Publishing gallery changes online...");
+              const published = await publishGalleryOnline(gallery);
+              setGallerySaveMessage(published ? "Gallery changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+            }} className="w-fit bg-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-pink-600">Publish Gallery</button>
+            <button type="button" onClick={resetGallery} className="w-fit border border-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-stone-950 hover:text-white">Reset Gallery</button>
+          </div>
         </div>
 
         <form onSubmit={addGalleryItem} className="mb-8 grid gap-4 border border-pink-100 bg-[#fff8fb] p-5 shadow-sm lg:grid-cols-4">
@@ -1302,10 +1326,12 @@ function LittleJessieGalleryAdmin({ gallery, setGallery }) {
   );
 }
 
-function LittleJessieAdminPanel({ products, setProducts }) {
+function LittleJessieAdminPanel({ products, setProducts, publishProductsOnline }) {
   const emptyDraft = { name: "", description: "", price: "", discount: "0", status: "Made to Order", image: "", available: true };
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState(null);
+  const [productSaveMessage, setProductSaveMessage] = useState("");
+  const publishTimerRef = useRef(null);
   const [inquiries, setInquiries] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(littleJessieInquiryStorageKey)) || [];
@@ -1314,9 +1340,22 @@ function LittleJessieAdminPanel({ products, setProducts }) {
     }
   });
 
+  useEffect(() => {
+    return () => {
+      if (publishTimerRef.current) window.clearTimeout(publishTimerRef.current);
+    };
+  }, []);
+
   const saveProducts = (nextProducts) => {
     setProducts(nextProducts);
     localStorage.setItem(littleJessieProductStorageKey, JSON.stringify(nextProducts));
+    if (!publishProductsOnline) return;
+    setProductSaveMessage("Saving Little Jessie changes online...");
+    if (publishTimerRef.current) window.clearTimeout(publishTimerRef.current);
+    publishTimerRef.current = window.setTimeout(async () => {
+      const published = await publishProductsOnline(nextProducts);
+      setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+    }, 900);
   };
 
   const updateProduct = (id, updates) => {
@@ -1386,8 +1425,17 @@ function LittleJessieAdminPanel({ products, setProducts }) {
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-pink-500">Little Jessie Studyo Admin</p>
             <h2 className="mt-2 font-serif text-3xl font-bold sm:text-4xl">Products and Inquiries</h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">Manage Little Jessie products, photos, prices, discounts, availability, and customer inquiries.</p>
+            {productSaveMessage && <p className="mt-3 w-fit border border-pink-100 bg-white px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-pink-700">{productSaveMessage}</p>}
           </div>
-          <button type="button" onClick={resetProducts} className="w-fit border border-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-stone-950 hover:text-white">Reset Little Jessie Products</button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button type="button" onClick={async () => {
+              if (!publishProductsOnline) return;
+              setProductSaveMessage("Publishing Little Jessie changes online...");
+              const published = await publishProductsOnline(products);
+              setProductSaveMessage(published ? "Little Jessie changes are live online." : "Saved on this browser only. Cloud publish needs checking.");
+            }} className="w-fit bg-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-pink-600">Publish Products</button>
+            <button type="button" onClick={resetProducts} className="w-fit border border-stone-950 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-stone-950 hover:text-white">Reset Little Jessie Products</button>
+          </div>
         </div>
 
         <form onSubmit={addProduct} className="mb-8 grid gap-4 border border-pink-100 bg-white p-5 shadow-sm lg:grid-cols-4">
@@ -1642,7 +1690,7 @@ function AdminPaymentRecords({ orders }) {
   );
 }
 
-function AdminDashboard({ orders, setOrders, productsCatalog, setProductsCatalog, publishTgsProducts, littleJessieProducts, setLittleJessieProducts, littleJessieGallery, setLittleJessieGallery, onLogout }) {
+function AdminDashboard({ orders, setOrders, productsCatalog, setProductsCatalog, publishTgsProducts, littleJessieProducts, setLittleJessieProducts, publishLittleJessieProducts, littleJessieGallery, setLittleJessieGallery, publishLittleJessieGallery, onLogout }) {
   return (
     <div id="admin">
       <section className="border-t border-[#ead9a8]/70 bg-neutral-950 py-8 text-white">
@@ -1657,10 +1705,10 @@ function AdminDashboard({ orders, setOrders, productsCatalog, setProductsCatalog
       <AdminPaymentRecords orders={orders} />
       <AdminOrdersPanel orders={orders} setOrders={setOrders} />
       <AdminPanel productsCatalog={productsCatalog} setProductsCatalog={setProductsCatalog} publishProductsOnline={publishTgsProducts} />
-      <LittleJessieAdminPanel products={littleJessieProducts} setProducts={setLittleJessieProducts} />
+      <LittleJessieAdminPanel products={littleJessieProducts} setProducts={setLittleJessieProducts} publishProductsOnline={publishLittleJessieProducts} />
       <LittleJessieRentalScheduleAdminPanel />
       <LittleJessieRentalAdminPanel />
-      <LittleJessieGalleryAdmin gallery={littleJessieGallery} setGallery={setLittleJessieGallery} />
+      <LittleJessieGalleryAdmin gallery={littleJessieGallery} setGallery={setLittleJessieGallery} publishGalleryOnline={publishLittleJessieGallery} />
     </div>
   );
 }
@@ -2129,7 +2177,7 @@ function AdminPanel({ productsCatalog, setProductsCatalog, publishProductsOnline
 }
 
 
-function LittleJessieStudioPage({ products = defaultLittleJessieProducts, gallery = defaultLittleJessieGallery }) {
+function LittleJessieStudioPage({ products = defaultLittleJessieProducts, gallery = defaultLittleJessieGallery, onHome }) {
   const [inquiry, setInquiry] = useState({
     fullName: "",
     mobile: "",
@@ -2530,14 +2578,28 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
 
   return (
     <main className="min-h-screen bg-[#fff8fb] text-stone-950">
-      <header className="border-b border-pink-100 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-          <a href="/" className="text-sm font-semibold text-stone-600 hover:text-stone-950">Our Brands</a>
-          <img src="/assets/little-jessie-logo-2026.jfif" alt="Little Jessie Studyo" className="h-12 w-12 rounded-full border border-pink-100 object-cover shadow-sm" />
+      <header className="sticky top-0 z-50 border-b border-pink-100 bg-white/90 shadow-[0_8px_30px_rgba(236,72,153,0.06)] backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-3 sm:h-20 sm:px-6 lg:px-8">
+          <a href="#little-jessie-top" className="flex min-w-0 items-center gap-3 text-left">
+            <img src="/assets/little-jessie-logo-2026.jfif" alt="Little Jessie Studyo" className="h-10 w-10 rounded-full border border-pink-100 object-cover shadow-sm sm:h-14 sm:w-14" />
+            <div className="min-w-0 leading-none">
+              <p className="truncate text-sm font-black tracking-[0.12em] text-stone-950 sm:text-lg">Little Jessie</p>
+              <p className="mt-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-pink-500 sm:text-[10px]">Studyo</p>
+            </div>
+          </a>
+          <nav className="hidden items-center gap-6 text-sm font-semibold md:flex">
+            <a href="#little-jessie-menu" className="text-stone-600 transition hover:text-pink-500">Menu</a>
+            <a href="#little-jessie-rental" className="text-stone-600 transition hover:text-pink-500">Rental</a>
+            <a href="#little-jessie-gallery" className="text-stone-600 transition hover:text-pink-500">Gallery</a>
+            <a href="#little-jessie-inquiry" className="text-stone-600 transition hover:text-pink-500">Inquiry</a>
+          </nav>
+          <button type="button" onClick={onHome} className="border border-pink-200 bg-[#fff8fb] px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-pink-700 transition hover:bg-pink-500 hover:text-white">
+            Our Brands
+          </button>
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-10 px-4 py-14 md:grid-cols-2 md:items-center md:py-20">
+      <section id="little-jessie-top" className="mx-auto grid max-w-7xl gap-10 px-4 py-14 md:grid-cols-2 md:items-center md:py-20">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.28em] text-pink-500">Personalized souvenirs and school labels</p>
           <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-6xl">Cute Keepsakes, Made Personal</h1>
@@ -3265,6 +3327,62 @@ export default function App() {
     }
   };
 
+  const publishLittleJessieProducts = async (nextProducts = littleJessieProducts) => {
+    localStorage.setItem(littleJessieProductStorageKey, JSON.stringify(nextProducts));
+
+    if (!backendEnabled) {
+      setNotice("Little Jessie product changes were saved on this browser. Supabase is not configured yet.");
+      window.setTimeout(() => setNotice(""), 3200);
+      return false;
+    }
+
+    try {
+      const cloudProducts = await fetchTable("little_jessie_products");
+      const nextIds = nextProducts.map((product) => product.id).filter(Boolean);
+      const cloudIds = Array.isArray(cloudProducts) ? cloudProducts.map((product) => product.id).filter(Boolean) : [];
+      const removedIds = cloudIds.filter((id) => !nextIds.includes(id));
+      await Promise.all(removedIds.map((id) => deleteRecord("little_jessie_products", "id", id)));
+      if (nextProducts.length) await upsertRecords("little_jessie_products", nextProducts.map(toDbLittleJessieProduct));
+      littleJessieProductIdsRef.current = nextIds;
+      setNotice("Little Jessie product changes are now live online.");
+      window.setTimeout(() => setNotice(""), 3200);
+      return true;
+    } catch (error) {
+      console.error(error);
+      setNotice("Little Jessie product changes were saved on this browser, but the online database did not accept the update.");
+      window.setTimeout(() => setNotice(""), 4200);
+      return false;
+    }
+  };
+
+  const publishLittleJessieGallery = async (nextGallery = littleJessieGallery) => {
+    localStorage.setItem(littleJessieGalleryStorageKey, JSON.stringify(nextGallery));
+
+    if (!backendEnabled) {
+      setNotice("Little Jessie gallery changes were saved on this browser. Supabase is not configured yet.");
+      window.setTimeout(() => setNotice(""), 3200);
+      return false;
+    }
+
+    try {
+      const cloudGallery = await fetchTable("little_jessie_gallery");
+      const nextIds = nextGallery.map((item) => item.id).filter(Boolean);
+      const cloudIds = Array.isArray(cloudGallery) ? cloudGallery.map((item) => item.id).filter(Boolean) : [];
+      const removedIds = cloudIds.filter((id) => !nextIds.includes(id));
+      await Promise.all(removedIds.map((id) => deleteRecord("little_jessie_gallery", "id", id)));
+      if (nextGallery.length) await upsertRecords("little_jessie_gallery", nextGallery.map(toDbLittleJessieGallery));
+      littleJessieGalleryIdsRef.current = nextIds;
+      setNotice("Little Jessie gallery changes are now live online.");
+      window.setTimeout(() => setNotice(""), 3200);
+      return true;
+    } catch (error) {
+      console.error(error);
+      setNotice("Little Jessie gallery changes were saved on this browser, but the online database did not accept the update.");
+      window.setTimeout(() => setNotice(""), 4200);
+      return false;
+    }
+  };
+
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 
   const filteredProducts = useMemo(() => {
@@ -3405,7 +3523,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#fffdf8] text-neutral-950">
         {adminUnlocked ? (
-          <AdminDashboard orders={orders} setOrders={setOrders} productsCatalog={productsCatalog} setProductsCatalog={setProductsCatalog} publishTgsProducts={publishTgsProducts} littleJessieProducts={littleJessieProducts} setLittleJessieProducts={setLittleJessieProducts} littleJessieGallery={littleJessieGallery} setLittleJessieGallery={setLittleJessieGallery} onLogout={logoutAdmin} />
+          <AdminDashboard orders={orders} setOrders={setOrders} productsCatalog={productsCatalog} setProductsCatalog={setProductsCatalog} publishTgsProducts={publishTgsProducts} littleJessieProducts={littleJessieProducts} setLittleJessieProducts={setLittleJessieProducts} publishLittleJessieProducts={publishLittleJessieProducts} littleJessieGallery={littleJessieGallery} setLittleJessieGallery={setLittleJessieGallery} publishLittleJessieGallery={publishLittleJessieGallery} onLogout={logoutAdmin} />
         ) : (
           <AdminLoginPanel onLogin={() => setAdminUnlocked(true)} />
         )}
