@@ -4,7 +4,7 @@ import { backendEnabled, cloudinaryConfig, cloudinaryEnabled, deleteRecord, fetc
 
 const navItems = ["Home", "Shop", "Track", "About", "FAQ", "Contact"];
 const logo = "/assets/tgs-logo.jfif";
-const corporateLogo = "/assets/tgs-enterprises-corp-logo.svg";
+const corporateLogo = "/assets/tgs-enterprises-corp-logo-2026.png";
 const heroImage = "/assets/tgs-hero-model.png";
 const birRegistrationImage = "/assets/registrations/bir-registration.jfif";
 const tgsBirRegistrationImage = "/assets/registrations/tgs-bir-registration.jfif";
@@ -3696,8 +3696,8 @@ function CorporateLandingPage({ onNavigate }) {
     <main className="min-h-screen bg-[#fffdf8] text-neutral-950">
       <header className="sticky top-0 z-50 border-b border-[#ead9a8]/70 bg-[#fffdf8]/95 shadow-[0_12px_40px_rgba(17,17,17,0.06)] backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <button type="button" onClick={() => onNavigate("/")} className="flex w-fit items-center gap-3 border border-[#ead9a8]/80 bg-white px-4 py-3 text-left shadow-[0_14px_35px_rgba(17,17,17,0.06)]">
-            <img src={corporateLogo} alt="TGS Enterprises Corp." className="h-10 w-auto object-contain sm:h-12" />
+          <button type="button" onClick={() => onNavigate("/")} className="flex w-fit items-center gap-3 border border-[#ead9a8]/80 bg-white px-4 py-2 text-left shadow-[0_14px_35px_rgba(17,17,17,0.06)]">
+            <img src={corporateLogo} alt="TGS Enterprises Corp." className="h-14 w-auto object-contain sm:h-16" />
           </button>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
             <nav className="flex items-center gap-4 text-sm font-semibold">
