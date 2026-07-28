@@ -3751,16 +3751,10 @@ function CorporateLandingPage({ onNavigate }) {
           <button type="button" onClick={() => onNavigate("/")} className="flex w-fit items-center gap-3 border border-[#ead9a8]/80 bg-white px-4 py-2 text-left shadow-[0_14px_35px_rgba(17,17,17,0.06)]">
             <img src={corporateLogo} alt="TGS Enterprises Corp." className="h-14 w-auto object-contain sm:h-16" />
           </button>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
-            <nav className="flex items-center gap-4 text-sm font-semibold">
-              <a href="#brands" className="text-neutral-600 transition hover:text-[#9f7418]">Brands</a>
-              <a href="#registration" className="text-neutral-600 transition hover:text-[#9f7418]">Company Info</a>
-            </nav>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => onNavigate("/the-grace-shop")} className="bg-neutral-950 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#9f7418]">Grace Shop</button>
-              <button type="button" onClick={() => onNavigate("/little-jessie-studio")} className="border border-pink-200 bg-white px-4 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-pink-700 transition hover:bg-pink-500 hover:text-white">Little Jessie</button>
-            </div>
-          </div>
+          <nav className="flex items-center gap-5 text-sm font-semibold">
+            <a href="#businesses" className="text-neutral-600 transition hover:text-[#9f7418]">Businesses</a>
+            <a href="#registration" className="text-neutral-600 transition hover:text-[#9f7418]">Registration</a>
+          </nav>
         </div>
       </header>
 
@@ -3775,11 +3769,15 @@ function CorporateLandingPage({ onNavigate }) {
           </div>
         </div>
         <div className="border border-[#ead9a8]/70 bg-white p-6 shadow-[0_30px_80px_rgba(17,17,17,0.08)]">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">Business Snapshot</p>
-          <div className="mt-6 grid gap-4">
-            <div className="border border-neutral-100 bg-[#fff9ed] p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#b78a1f]">Fashion Retail</p><p className="mt-2 text-xl font-bold">The Grace Shop Bags</p></div>
-            <div className="border border-neutral-100 bg-[#fff8fb] p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-pink-500">Creative Services</p><p className="mt-2 text-xl font-bold">Little Jessie Studyo</p></div>
-            <div className="border border-neutral-100 bg-neutral-50 p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-neutral-500">Customer Support</p><p className="mt-2 text-xl font-bold">Online Orders and Bookings</p></div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">What We Handle</p>
+          <h2 className="mt-4 font-serif text-3xl font-bold leading-tight">A simple online home for shopping, custom orders, and event bookings.</h2>
+          <div className="mt-6 grid gap-3">
+            {["Retail orders", "Custom keepsakes", "Event reservations"].map((item) => (
+              <div key={item} className="flex items-center justify-between border border-neutral-100 bg-[#fffdf8] px-4 py-3">
+                <span className="text-sm font-semibold text-neutral-700">{item}</span>
+                <span className="h-2 w-2 bg-[#b78a1f]" aria-hidden="true" />
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -3803,11 +3801,11 @@ function CorporateLandingPage({ onNavigate }) {
         </div>
       </section>
 
-      <section id="brands" className="border-b border-neutral-200 bg-white py-16">
+      <section id="businesses" className="border-b border-neutral-200 bg-white py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-8 max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-neutral-500">Our Brands</p>
-            <h2 className="mt-3 font-serif text-3xl font-bold sm:text-4xl">Two focused businesses under one growing company.</h2>
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-neutral-500">Our Businesses</p>
+            <h2 className="mt-3 font-serif text-3xl font-bold sm:text-4xl">Two focused service lines under one growing company.</h2>
           </div>
           <div className="grid gap-5 md:grid-cols-2">
             {brandCards.map((brand) => (
@@ -3818,7 +3816,7 @@ function CorporateLandingPage({ onNavigate }) {
                 <div className="mt-5 flex flex-wrap gap-2">
                   {brand.details.map((detail) => <span key={detail} className="border border-white bg-white px-3 py-2 text-xs font-semibold text-neutral-700">{detail}</span>)}
                 </div>
-                <button type="button" onClick={() => onNavigate(brand.path)} className="mt-6 border border-neutral-950 bg-white px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] hover:bg-neutral-950 hover:text-white">Open Brand</button>
+                <button type="button" onClick={() => onNavigate(brand.path)} className="mt-6 border border-neutral-950 bg-white px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] hover:bg-neutral-950 hover:text-white">Open</button>
               </article>
             ))}
           </div>
