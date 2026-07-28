@@ -2766,6 +2766,8 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
   const [fullPaymentMessage, setFullPaymentMessage] = useState("");
   const [fullPaymentConfirmationOpen, setFullPaymentConfirmationOpen] = useState(false);
   const [fullPaymentToastOpen, setFullPaymentToastOpen] = useState(false);
+  const [inquiryOpen, setInquiryOpen] = useState(false);
+  const [rentalBookingOpen, setRentalBookingOpen] = useState(false);
   const [rentalTrackCode, setRentalTrackCode] = useState("");
   const [rentalSchedules, setRentalSchedules] = useState(() => {
     try { return JSON.parse(localStorage.getItem(littleJessieRentalScheduleStorageKey) || "[]"); } catch { return []; }
@@ -3117,6 +3119,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
     setRentalMessage("SCHEDULE SUBMITTED. Your reservation code is " + reservationCode + ". Please keep this code for payment follow-up. Reservation is confirmed after admin verifies your " + (rentalBooking.paymentOption === "Full payment" ? "full payment" : "50% down payment") + ". Transportation fee is based on your selected event location." + (onlineSaved ? " Your booking was also sent to our online admin records." : " If admin cannot see this immediately, please send your reservation code to Little Jessie Studyo."));
     window.setTimeout(() => document.getElementById("rental-submit-status")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
     setRentalSubmitting(false);
+    setRentalBookingOpen(false);
     setRentalBooking({
       fullName: "",
       mobile: "",
@@ -3170,6 +3173,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
 
     localStorage.setItem(littleJessieInquiryStorageKey, JSON.stringify([nextInquiry, ...savedInquiries]));
     setInquirySaved(true);
+    setInquiryOpen(false);
     setInquiry({
       fullName: "",
       mobile: "",
@@ -3253,7 +3257,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
           <div className="mt-8 flex flex-wrap gap-3">
             <a href="#little-jessie-menu" className="bg-stone-950 px-5 py-3 text-sm font-semibold text-white hover:bg-stone-800">View Menu</a>
             <a href="#little-jessie-rental" className="border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 hover:border-pink-300">Rental</a>
-            <a href="#little-jessie-inquiry" className="border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 hover:border-pink-300">Send Inquiry</a>
+            <button type="button" onClick={() => setInquiryOpen(true)} className="border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 hover:border-pink-300">Send Inquiry</button>
             <a href={socialLinks.littleJessie} target="_blank" rel="noreferrer" className="border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-pink-700 hover:border-pink-300 hover:bg-[#fff1f6]">Facebook Page</a>
           </div>
         </div>
@@ -3302,9 +3306,9 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
                 A preview of the kind of personalized pieces Little Jessie Studyo can prepare. Real customer photos can be uploaded here before launch.
               </p>
             </div>
-            <a href="#little-jessie-inquiry" className="w-fit border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 hover:border-pink-300">
+            <button type="button" onClick={() => setInquiryOpen(true)} className="w-fit border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 hover:border-pink-300">
               Request a Custom Design
-            </a>
+            </button>
             <a href={socialLinks.littleJessie} target="_blank" rel="noreferrer" className="w-fit border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-pink-700 hover:border-pink-300 hover:bg-white">
               View Facebook Page
             </a>
@@ -3449,7 +3453,35 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
                 </div>
               </div>
 
-            <form onSubmit={saveRentalBooking} className="border border-pink-100 bg-[#fff8fb] p-5 shadow-sm">
+              <div className="border border-pink-100 bg-[#fff8fb] p-5 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-pink-500">Ready to Book?</p>
+                <h3 className="mt-2 text-2xl font-semibold tracking-tight">Open the rental booking form when your date is set.</h3>
+                <p className="mt-3 text-sm leading-7 text-stone-600">The form opens in a focused panel so customers can complete booking details without scrolling through the full page.</p>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <button type="button" onClick={() => setRentalBookingOpen(true)} disabled={rentalDateFullyBooked} className="bg-stone-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-pink-600 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500">{rentalDateFullyBooked ? "Date Fully Booked" : "Book Rental Service"}</button>
+                  <button type="button" onClick={openFullPaymentModal} className="border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 transition hover:border-pink-300">Settle Full Payment</button>
+                </div>
+                {rentalMessage && <div className={"mt-4 border p-3 text-sm font-semibold leading-6 " + (rentalSaved ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700")}><p className="font-bold">{rentalSaved ? "Schedule Submitted" : "Please adjust your schedule"}</p><p className="mt-1">{rentalMessage}</p></div>}
+                {rentalBooking.eventDate && <p className="mt-4 border border-pink-100 bg-white p-3 text-sm font-semibold text-pink-700">Selected date: {selectedRentalDateLabel}</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {rentalBookingOpen && (
+        <div className="fixed inset-0 z-[80] overflow-y-auto bg-stone-950/60 px-4 py-6">
+          <div className="mx-auto max-w-3xl border border-pink-100 bg-[#fff8fb] p-5 shadow-2xl sm:p-6">
+            <div className="mb-5 flex items-start justify-between gap-4 border border-pink-100 bg-white p-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-pink-500">Rental Booking</p>
+                <h3 className="mt-2 text-2xl font-semibold tracking-tight">Complete your rental request</h3>
+                <p className="mt-1 text-sm leading-6 text-stone-600">{rentalDayStatus}</p>
+              </div>
+              <button type="button" onClick={() => setRentalBookingOpen(false)} className="border border-pink-200 bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-stone-700 hover:border-pink-300">Close</button>
+            </div>
+
+            <form onSubmit={saveRentalBooking} className="bg-[#fff8fb]">
               <div className="mb-5 flex flex-col justify-between gap-3 border border-pink-100 bg-white p-4 sm:flex-row sm:items-center">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-pink-500">Calendar Slots</p>
@@ -3506,10 +3538,9 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
                 <button type="button" onClick={openFullPaymentModal} className="w-full border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 hover:border-pink-300">Settle Full Payment</button>
               </div>
             </form>
-            </div>
           </div>
         </div>
-      </section>
+      )}
 
       <section className="bg-stone-950 py-14 text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 md:grid-cols-4">
@@ -3528,9 +3559,29 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.25em] text-pink-500">Customer order form</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">Tell us what you want to customize.</h2>
-            <p className="mt-4 text-sm leading-7 text-stone-600">This saves the inquiry on this browser for now. QR codes and real online sending can be connected before launch.</p>
+            <p className="mt-4 text-sm leading-7 text-stone-600">Open the form only when you are ready to send complete order details. This keeps browsing clean while keeping the ordering process easy.</p>
             {inquirySaved && <div className="mt-5 border border-pink-200 bg-white p-4 text-sm font-semibold text-pink-700">Inquiry saved. We will connect this to Little Jessie admin tracking next.</div>}
           </div>
+
+          <div className="border border-pink-100 bg-white p-6 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-pink-500">Custom Orders</p>
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight">Order personalized souvenirs, labels, or keychains.</h3>
+            <p className="mt-3 text-sm leading-7 text-stone-600">Use this for made-to-order items, party souvenirs, school labels, and custom gift details.</p>
+            <button type="button" onClick={() => setInquiryOpen(true)} className="mt-5 w-full bg-stone-950 px-5 py-3 text-sm font-semibold text-white hover:bg-pink-600 sm:w-fit">Order Custom Product</button>
+          </div>
+        </div>
+      </section>
+
+      {inquiryOpen && (
+        <div className="fixed inset-0 z-[80] overflow-y-auto bg-stone-950/60 px-4 py-6">
+          <div className="mx-auto max-w-3xl border border-pink-100 bg-white p-5 shadow-2xl sm:p-6">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-pink-500">Custom Order</p>
+                <h3 className="mt-2 text-2xl font-semibold tracking-tight">Send your Little Jessie order details</h3>
+              </div>
+              <button type="button" onClick={() => setInquiryOpen(false)} className="border border-pink-200 bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-stone-700 hover:border-pink-300">Close</button>
+            </div>
 
           <form onSubmit={saveInquiry} className="border border-pink-100 bg-white p-5 shadow-sm">
             <p className="mb-4 border border-pink-200 bg-[#fff8fb] p-3 text-sm font-semibold leading-6 text-pink-700">We do not accept rush orders. Please ensure your required date allows enough production time before placing your order.</p>
@@ -3574,8 +3625,9 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
             <label className="mt-4 block text-sm font-semibold">Order Details / Special Instructions<textarea value={inquiry.details} onChange={(e) => updateInquiry("details", e.target.value)} required className="mt-2 min-h-28 w-full border border-stone-200 px-3 py-3 text-sm font-normal outline-none focus:border-pink-300" /></label>
             <button type="submit" className="mt-5 w-full bg-stone-950 px-5 py-3 text-sm font-semibold text-white hover:bg-stone-800">Submit Inquiry</button>
           </form>
+          </div>
         </div>
-      </section>
+      )}
 
       <section id="little-jessie-faq" className="border-t border-pink-100 bg-white py-14">
         <div className="mx-auto max-w-7xl px-4">
