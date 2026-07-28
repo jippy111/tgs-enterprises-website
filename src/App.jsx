@@ -16,6 +16,10 @@ const paymentQrImages = {
   MariBank: "/assets/payments/maribank-qr.jfif",
   GoTyme: "/assets/payments/gotyme-qr.jfif",
 };
+const socialLinks = {
+  theGraceShop: "https://www.facebook.com/thegraceshopbagandaccessories",
+  littleJessie: "https://www.facebook.com/littlejessiestudioph",
+};
 const littleJessiePaymentMethods = ["GCash (via QR Code)", "Maya (via QR Code)", "MariBank", "GoTyme Bank"];
 const deliveryFee = 150;
 const cartStorageKey = "tgs-cart-items";
@@ -1254,6 +1258,9 @@ function ContactSection() {
             Phone: 09524804413<br />
             Hours: Monday to Sunday, 10 AM to 8 PM
           </p>
+          <a href={socialLinks.theGraceShop} target="_blank" rel="noreferrer" className="mt-5 inline-flex border border-[#d7bd72] bg-[#fff9ed] px-4 py-3 text-xs font-bold uppercase tracking-[0.14em] text-neutral-950 transition hover:bg-neutral-950 hover:text-white">
+            Message on Facebook
+          </a>
         </aside>
       </div>
     </section>
@@ -3247,6 +3254,7 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
             <a href="#little-jessie-menu" className="bg-stone-950 px-5 py-3 text-sm font-semibold text-white hover:bg-stone-800">View Menu</a>
             <a href="#little-jessie-rental" className="border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 hover:border-pink-300">Rental</a>
             <a href="#little-jessie-inquiry" className="border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 hover:border-pink-300">Send Inquiry</a>
+            <a href={socialLinks.littleJessie} target="_blank" rel="noreferrer" className="border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-pink-700 hover:border-pink-300 hover:bg-[#fff1f6]">Facebook Page</a>
           </div>
         </div>
         <div className="border border-pink-100 bg-white p-8 shadow-sm">
@@ -3296,6 +3304,9 @@ function LittleJessieStudioPage({ products = defaultLittleJessieProducts, galler
             </div>
             <a href="#little-jessie-inquiry" className="w-fit border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-stone-950 hover:border-pink-300">
               Request a Custom Design
+            </a>
+            <a href={socialLinks.littleJessie} target="_blank" rel="noreferrer" className="w-fit border border-pink-200 bg-white px-5 py-3 text-sm font-semibold text-pink-700 hover:border-pink-300 hover:bg-white">
+              View Facebook Page
             </a>
           </div>
 
@@ -3683,16 +3694,21 @@ function CorporateLandingPage({ onNavigate }) {
 
   return (
     <main className="min-h-screen bg-[#fffdf8] text-neutral-950">
-      <header className="border-b border-neutral-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
-          <button type="button" onClick={() => onNavigate("/")} className="text-left">
-            <img src={corporateLogo} alt="TGS Enterprises Corp." className="h-12 w-auto object-contain" />
+      <header className="sticky top-0 z-50 border-b border-[#ead9a8]/70 bg-[#fffdf8]/95 shadow-[0_12px_40px_rgba(17,17,17,0.06)] backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+          <button type="button" onClick={() => onNavigate("/")} className="flex w-fit items-center gap-3 border border-[#ead9a8]/80 bg-white px-4 py-3 text-left shadow-[0_14px_35px_rgba(17,17,17,0.06)]">
+            <img src={corporateLogo} alt="TGS Enterprises Corp." className="h-10 w-auto object-contain sm:h-12" />
           </button>
-          <nav className="hidden items-center gap-6 text-sm font-semibold md:flex">
-            <a href="#brands" className="text-neutral-600 hover:text-neutral-950">Brands</a>
-            <a href="#leadership" className="text-neutral-600 hover:text-neutral-950">Leadership</a>
-            <a href="#information" className="text-neutral-600 hover:text-neutral-950">Company Info</a>
-          </nav>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
+            <nav className="flex items-center gap-4 text-sm font-semibold">
+              <a href="#brands" className="text-neutral-600 transition hover:text-[#9f7418]">Brands</a>
+              <a href="#registration" className="text-neutral-600 transition hover:text-[#9f7418]">Company Info</a>
+            </nav>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => onNavigate("/the-grace-shop")} className="bg-neutral-950 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#9f7418]">Grace Shop</button>
+              <button type="button" onClick={() => onNavigate("/little-jessie-studio")} className="border border-pink-200 bg-white px-4 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-pink-700 transition hover:bg-pink-500 hover:text-white">Little Jessie</button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -3753,19 +3769,6 @@ function CorporateLandingPage({ onNavigate }) {
                 <button type="button" onClick={() => onNavigate(brand.path)} className="mt-6 border border-neutral-950 bg-white px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] hover:bg-neutral-950 hover:text-white">Open Brand</button>
               </article>
             ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="leadership" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="grid gap-8 md:grid-cols-[.8fr_1.2fr] md:items-start">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#b78a1f]">Leadership</p>
-            <h2 className="mt-3 font-serif text-3xl font-bold sm:text-4xl">Built with family leadership and clear operations.</h2>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="border border-neutral-200 bg-white p-5"><p className="text-sm font-bold text-neutral-500">President</p><h3 className="mt-2 text-2xl font-bold">Executive Leadership</h3><p className="mt-3 text-sm leading-6 text-neutral-600">Oversees business direction, brand growth, customer experience, and operational planning.</p></div>
-            <div className="border border-neutral-200 bg-white p-5"><p className="text-sm font-bold text-neutral-500">Secretary</p><h3 className="mt-2 text-2xl font-bold">Corporate Administration</h3><p className="mt-3 text-sm leading-6 text-neutral-600">Supports documentation, coordination, customer records, and organized administrative workflows.</p></div>
           </div>
         </div>
       </section>
@@ -3867,7 +3870,13 @@ function Footer() {
           <p className="text-xl font-black tracking-[0.24em]">TGS</p>
           <p className="mt-2 text-sm text-white/60">Style with Grace</p>
         </div>
-        <p className="text-sm text-white/60">Own-brand fashion bags for graceful everyday style.</p>
+        <div className="flex flex-col gap-3 text-sm text-white/60 md:items-end">
+          <p>Own-brand fashion bags for graceful everyday style.</p>
+          <div className="flex flex-wrap gap-3">
+            <a href={socialLinks.theGraceShop} target="_blank" rel="noreferrer" className="border border-white/20 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:bg-white hover:text-neutral-950">The Grace Shop Facebook</a>
+            <a href={socialLinks.littleJessie} target="_blank" rel="noreferrer" className="border border-white/20 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:bg-white hover:text-neutral-950">Little Jessie Facebook</a>
+          </div>
+        </div>
       </div>
     </footer>
   );
