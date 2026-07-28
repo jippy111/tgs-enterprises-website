@@ -720,6 +720,15 @@ function ProductModal({ product, onClose, onAdd }) {
     if (product) setSelectedColor(getDefaultColor(product));
   }, [product?.id]);
 
+  useEffect(() => {
+    if (!product) return;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [product, onClose]);
+
   if (!product) return null;
 
   const colors = getProductColors(product);
@@ -729,7 +738,10 @@ function ProductModal({ product, onClose, onAdd }) {
 
   return (
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/45 p-2 sm:p-4" onClick={onClose}>
-      <div className="mx-auto my-2 grid max-w-5xl bg-white shadow-2xl sm:my-8 md:grid-cols-2" onClick={(event) => event.stopPropagation()}>
+      <div className="relative mx-auto my-2 grid max-w-5xl bg-white shadow-2xl sm:my-8 md:grid-cols-2" onClick={(event) => event.stopPropagation()}>
+        <button type="button" onClick={onClose} aria-label="Close product details" className="absolute right-3 top-3 z-10 grid h-11 w-11 place-items-center border border-neutral-200 bg-white text-xl font-bold text-neutral-950 shadow-lg transition hover:border-neutral-950 hover:bg-neutral-950 hover:text-white">
+          x
+        </button>
         <div className="bg-[#f7f0df]">
           <img src={product.image} alt={product.name} className="h-full max-h-[320px] min-h-[240px] w-full object-cover sm:max-h-[420px] md:max-h-none md:min-h-[360px]" />
         </div>
