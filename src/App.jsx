@@ -1254,7 +1254,7 @@ function ContactSection() {
           <img src={logo} alt="TGS logo" className="h-20 w-20 object-contain" />
           <h3 className="mt-4 text-2xl font-bold">The Grace Shop</h3>
           <p className="mt-4 text-sm leading-7 text-neutral-600">
-            Email: thegraceshopcainta@gmail.com<br />
+            Email: gracecruz@tgs-enterprises-corp.net<br />
             Phone: 09524804413<br />
             Hours: Monday to Sunday, 10 AM to 8 PM
           </p>
@@ -3896,7 +3896,7 @@ function CorporateLandingPage({ onNavigate }) {
             <h2 className="mt-3 font-serif text-3xl font-bold sm:text-4xl">A transparent company built for everyday orders and special occasions.</h2>
             <p className="mt-4 text-sm leading-7 text-white/65">TGS Enterprises Corp. brings together fashion retail, personalized souvenirs, and event services with organized order handling, clear payment records, and customer-focused support.</p>
             <div className="mt-6 grid gap-2 text-sm text-white/70">
-              <p><span className="font-semibold text-white">Email:</span> thegraceshopcainta@gmail.com</p>
+              <p><span className="font-semibold text-white">Email:</span> gracecruz@tgs-enterprises-corp.net</p>
               <p><span className="font-semibold text-white">Mobile:</span> 09524804413</p>
               <p><span className="font-semibold text-white">Business Hours:</span> Monday to Sunday, 10:00 AM to 8:00 PM</p>
             </div>
